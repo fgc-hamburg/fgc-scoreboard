@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scoreboard Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #e5e5e5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    h1 { font-size: 1.4rem; margin-bottom: 1.5rem; color: #c40a18; letter-spacing: 0.05em; }
+
+    .panel {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    /* Players row */
+    .players {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .player-card {
+      background: #252525;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .player-card h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+
+    input[type="text"], select {
+      background: #1a1a1a;
+      border: 1px solid #3a3a3a;
+      border-radius: 5px;
+      color: #e5e5e5;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.95rem;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: #c40a18;
+    }
+
+    .score-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .score-display {
+      font-size: 2.2rem;
+      font-weight: bold;
+      min-width: 2.5rem;
+      text-align: center;
+      color: #fff;
+    }
+
+    .score-btns {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      padding: 0.45rem 0.85rem;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    button:active { opacity: 0.8; }
+
+    .btn-plus  { background: #2d6a2d; color: #fff; }
+    .btn-minus { background: #5a2020; color: #fff; }
+    .btn-reset { background: #3a3a3a; color: #ccc; font-size: 0.8rem; }
+
+    .btn-plus:hover  { background: #3a853a; }
+    .btn-minus:hover { background: #7a2828; }
+    .btn-reset:hover { background: #4a4a4a; }
+
+    /* Event info card */
+    .event-card {
+      background: #252525;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1rem;
+      align-items: end;
+    }
+
+    .event-card h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      grid-column: 1 / -1;
+      margin-bottom: -0.25rem;
+    }
+
+    /* Bottom row: round, game, swap */
+    .meta-row {
+      background: #252525;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      align-items: end;
+    }
+
+    /* Actions */
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: flex-end;
+      align-items: center;
+    }
+
+    .btn-submit {
+      background: #c40a18;
+      color: #fff;
+      font-size: 1rem;
+      padding: 0.6rem 1.5rem;
+      font-weight: 600;
+    }
+
+    .btn-submit:hover { background: #e01020; }
+
+    .btn-swap {
+      background: #1e3a5f;
+      color: #9dc3e6;
+      font-size: 0.85rem;
+      padding: 0.5rem 0.9rem;
+    }
+
+    .btn-swap:hover { background: #254e7a; }
+
+    /* Status message */
+    #status {
+      font-size: 0.82rem;
+      min-height: 1.1rem;
+      text-align: right;
+      color: #888;
+      transition: color 0.2s;
+    }
+
+    #status.ok  { color: #5cb85c; }
+    #status.err { color: #d9534f; }
+
+    /* Dirty indicator */
+    .dirty-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #c40a18;
+      margin-left: 6px;
+      vertical-align: middle;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .dirty-dot.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+  <h1>FGC Scoreboard Control</h1>
+
+  <div class="panel">
+    <!-- Event info -->
+    <div class="event-card">
+      <h2>Event Info</h2>
+      <label>
+        Event Name
+        <input type="text" id="eventName" placeholder="Hamburg FGC Weekly">
+      </label>
+      <label>
+        Date
+        <input type="text" id="eventDate" placeholder="2026-05-01">
+      </label>
+      <label>
+        Game
+        <select id="game">
+          <option value="BBCF">BBCF</option>
+          <option value="BBTAG">BBTAG</option>
+          <option value="COTW">COTW</option>
+          <option value="DBFZ">DBFZ</option>
+          <option value="GGST">GGST</option>
+          <option value="GGXRD" selected>GGXRD</option>
+          <option value="KOFXIV">KOFXIV</option>
+          <option value="MVCI">MVCI</option>
+          <option value="SF6">SF6</option>
+          <option value="SFVCE">SFVCE</option>
+          <option value="TEKKEN7">TEKKEN7</option>
+          <option value="TEKKEN8">TEKKEN8</option>
+          <option value="UMVC3">UMVC3</option>
+          <option value="UNICLR">UNICLR</option>
+          <option value="USF4">USF4</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="players">
+      <!-- Player 1 -->
+      <div class="player-card">
+        <h2>Player 1</h2>
+        <label>
+          Name
+          <input type="text" id="p1Name" tabindex="1" placeholder="Player 1">
+        </label>
+        <label>
+          Team / Sponsor
+          <input type="text" id="p1Team" placeholder="Team">
+        </label>
+        <label>Score</label>
+        <div class="score-row">
+          <div class="score-display" id="p1ScoreDisplay">0</div>
+          <div class="score-btns">
+            <button class="btn-plus"  onclick="adjustScore(1, 1)">+1</button>
+            <button class="btn-minus" onclick="adjustScore(1, -1)">-1</button>
+            <button class="btn-reset" onclick="resetScore(1)">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Player 2 -->
+      <div class="player-card">
+        <h2>Player 2</h2>
+        <label>
+          Name
+          <input type="text" id="p2Name" tabindex="2" placeholder="Player 2">
+        </label>
+        <label>
+          Team / Sponsor
+          <input type="text" id="p2Team" placeholder="Team">
+        </label>
+        <label>Score</label>
+        <div class="score-row">
+          <div class="score-display" id="p2ScoreDisplay">0</div>
+          <div class="score-btns">
+            <button class="btn-plus"  onclick="adjustScore(2, 1)">+1</button>
+            <button class="btn-minus" onclick="adjustScore(2, -1)">-1</button>
+            <button class="btn-reset" onclick="resetScore(2)">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Round -->
+    <div class="meta-row">
+      <label>
+        Round
+        <input type="text" id="round" tabindex="3" list="rounds-list" placeholder="Winners Finals">
+        <datalist id="rounds-list"></datalist>
+      </label>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <span id="status"></span>
+      <span class="dirty-dot" id="dirtyDot" title="Unsaved changes"></span>
+      <button class="btn-swap" onclick="swapPlayers()">&#8646; Swap</button>
+      <button class="btn-submit" onclick="submitData()">Submit</button>
+    </div>
+  </div>
+
+  <script>
+    // Local state — tracks what's in the UI (not yet submitted)
+    const state = {
+      eventName: "", eventDate: "",
+      p1Name: "", p1Team: "", p1Score: 0,
+      p2Name: "", p2Team: "", p2Score: 0,
+      round: "", game: "GGXRD"
+    };
+
+    // Last data loaded from server — used to detect external changes
+    let serverSnapshot = null;
+    // True when UI differs from last submitted/loaded state
+    let dirty = false;
+
+    // ---------- Init ----------
+
+    async function init() {
+      await loadRounds();
+      await loadData(true);
+      setInterval(() => loadData(false), 2000);
+    }
+
+    async function loadRounds() {
+      try {
+        const res = await fetch("/api/rounds");
+        const rounds = await res.json();
+        const dl = document.getElementById("rounds-list");
+        rounds.forEach(r => {
+          const opt = document.createElement("option");
+          opt.value = r;
+          dl.appendChild(opt);
+        });
+      } catch (_) {}
+    }
+
+    async function loadData(force) {
+      try {
+        const res = await fetch("/api/data");
+        const data = await res.json();
+        const snap = JSON.stringify(data);
+
+        // If server data hasn't changed since last check, skip
+        if (!force && snap === serverSnapshot) return;
+        serverSnapshot = snap;
+
+        // Don't overwrite unsaved local edits unless forced (initial load)
+        if (!dirty || force) {
+          applyToState(data);
+          renderAll();
+          setDirty(false);
+        }
+      } catch (_) {}
+    }
+
+    function todayISO() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    function applyToState(data) {
+      state.eventName = data.mText1 || "";
+      state.eventDate = data.mText2 || todayISO();
+      state.p1Name  = data.p1Name  ?? "";
+      state.p1Team  = data.p1Team  ?? "";
+      state.p1Score = parseInt(data.p1Score ?? "0", 10) || 0;
+      state.p2Name  = data.p2Name  ?? "";
+      state.p2Team  = data.p2Team  ?? "";
+      state.p2Score = parseInt(data.p2Score ?? "0", 10) || 0;
+      state.round   = data.round   ?? "";
+      state.game    = data.game    ?? "GGXRD";
+    }
+
+    // ---------- Render ----------
+
+    function renderAll() {
+      document.getElementById("eventName").value = state.eventName;
+      document.getElementById("eventDate").value = state.eventDate;
+      document.getElementById("p1Name").value  = state.p1Name;
+      document.getElementById("p1Team").value  = state.p1Team;
+      document.getElementById("p2Name").value  = state.p2Name;
+      document.getElementById("p2Team").value  = state.p2Team;
+      document.getElementById("round").value   = state.round;
+      document.getElementById("p1ScoreDisplay").textContent = state.p1Score;
+      document.getElementById("p2ScoreDisplay").textContent = state.p2Score;
+
+      const gameEl = document.getElementById("game");
+      const opt = [...gameEl.options].find(o => o.value === state.game);
+      if (opt) gameEl.value = state.game;
+    }
+
+    // ---------- Score controls ----------
+
+    function adjustScore(player, delta) {
+      const key = `p${player}Score`;
+      const prev = state[key];
+      state[key] = Math.max(0, state[key] + delta);
+      document.getElementById(`p${player}ScoreDisplay`).textContent = state[key];
+      setDirty(true);
+      // Only log if the score actually changed (e.g., -1 at 0 is a no-op)
+      if (state[key] !== prev) {
+        const sign = delta > 0 ? "+" : "";
+        logEvent("score_change", `${sign}${delta} P${player}`);
+      }
+    }
+
+    function resetScore(player) {
+      state[`p${player}Score`] = 0;
+      document.getElementById(`p${player}ScoreDisplay`).textContent = 0;
+      setDirty(true);
+      logEvent("score_reset", `P${player}`);
+    }
+
+    // ---------- Swap ----------
+
+    function swapPlayers() {
+      [state.p1Name, state.p2Name]   = [state.p2Name, state.p1Name];
+      [state.p1Team, state.p2Team]   = [state.p2Team, state.p1Team];
+      [state.p1Score, state.p2Score] = [state.p2Score, state.p1Score];
+      renderAll();
+      setDirty(true);
+      logEvent("swap");
+    }
+
+    // ---------- Read field values into state before submit ----------
+
+    function readFields() {
+      state.eventName = document.getElementById("eventName").value.trim();
+      state.eventDate = document.getElementById("eventDate").value.trim();
+      state.p1Name = document.getElementById("p1Name").value.trim();
+      state.p1Team = document.getElementById("p1Team").value.trim();
+      state.p2Name = document.getElementById("p2Name").value.trim();
+      state.p2Team = document.getElementById("p2Team").value.trim();
+      state.round  = document.getElementById("round").value.trim();
+      state.game   = document.getElementById("game").value;
+    }
+
+    // Track input edits as dirty
+    ["eventName", "eventDate", "p1Name", "p1Team", "p2Name", "p2Team", "round", "game"].forEach(id => {
+      document.getElementById(id).addEventListener("input", () => setDirty(true));
+    });
+
+    // Enter on any text input submits
+    document.querySelectorAll("input[type=text]").forEach(el => {
+      el.addEventListener("keydown", e => { if (e.key === "Enter") submitData(); });
+    });
+
+    // ---------- Submit ----------
+
+    async function submitData() {
+      readFields();
+      const payload = {
+        mText1:  state.eventName,
+        mText2:  state.eventDate,
+        p1Name:  state.p1Name,
+        p1Team:  state.p1Team,
+        p1Score: String(state.p1Score),
+        p2Name:  state.p2Name,
+        p2Team:  state.p2Team,
+        p2Score: String(state.p2Score),
+        round:   state.round,
+        game:    state.game,
+        // preserve fields not managed by this UI
+        cTitle1: "", cTitle2: "", mText3: "", mText4: "",
+      };
+
+      // Preserve unmanaged fields from last server snapshot
+      if (serverSnapshot) {
+        const prev = JSON.parse(serverSnapshot);
+        ["cTitle1","cTitle2","mText3","mText4"].forEach(k => {
+          if (prev[k] !== undefined) payload[k] = prev[k];
+        });
+      }
+
+      try {
+        const res = await fetch("/api/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          serverSnapshot = JSON.stringify({ ...payload, timestamp: "" }); // approximate
+          setDirty(false);
+          showStatus("Submitted.", "ok");
+          document.getElementById("p1Name").focus();
+        } else {
+          const err = await res.json();
+          showStatus("Error: " + err.error, "err");
+        }
+      } catch (e) {
+        showStatus("Network error: " + e.message, "err");
+      }
+    }
+
+    // ---------- Helpers ----------
+
+    let statusTimer = null;
+    function showStatus(msg, type) {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.className = type;
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(() => { el.textContent = ""; el.className = ""; }, 4000);
+    }
+
+    function setDirty(val) {
+      dirty = val;
+      document.getElementById("dirtyDot").classList.toggle("visible", val);
+    }
+
+    // ---------- Event log ----------
+
+    async function logEvent(eventType, delta = "") {
+      readFields();
+      const payload = {
+        event_type: eventType,
+        delta: delta,
+        event_name: state.eventName,
+        event_date: state.eventDate,
+        game: state.game,
+        round: state.round,
+        p1_name: state.p1Name,
+        p2_name: state.p2Name,
+        p1_score: String(state.p1Score),
+        p2_score: String(state.p2Score),
+      };
+      try {
+        await fetch("/api/log-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch (_) {}
+    }
+
+    init();
+  </script>
+</body>
+</html>

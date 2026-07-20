@@ -31,6 +31,35 @@ Finally, when you select a game (and hit save) the layout will adjust so that th
 * USF4
 ```
 
+## Control Dashboard
+
+A browser-based replacement for `StreamControl.exe` that works on macOS / Linux / Windows(and anywhere Python 3 is available).
+
+### Starting the dashboard
+
+```bash
+make run-dashboard
+```
+
+Then open **http://localhost:8080** in any browser. No dependencies required — pure Python stdlib.
+
+### What it does
+
+- Edit player names, team/sponsor tags, scores, round, and game
+- All changes are held locally in the UI — nothing is written until you click **Submit**
+- The red dot next to Submit indicates unsaved changes
+- **Swap Players** flips all P1/P2 fields (names, teams, scores) at once
+- The page re-syncs with the JSON every 2 seconds to catch any external edits (without overwriting your unsaved changes)
+
+**Environment variables**
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8080` | Port the dashboard server listens on |
+
+---
+
+
 ## Drop Me a Line
 If you found this at all useful, or have some suggestions, please let me know! You can drop me a line on twitter ([@tarikfayad](https://twitter.com/tarikfayad)), find me on Twitch ([ImpurestClub](https://www.twitch.tv/impurestclub/)), or ping me on my Discord server ([Link](https://discord.gg/ykj8tsN)).
 
