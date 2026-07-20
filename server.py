@@ -21,12 +21,38 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+import startgg
+
 BASE_DIR = Path(__file__).parent
+
+
+def _load_env_file(path):
+    """Minimal .env loader (KEY=VALUE lines). Real env vars take precedence.
+
+    Avoids a python-dotenv dependency so `python3 server.py` works on system
+    python3 (see Makefile).
+    """
+    try:
+        lines = path.read_text().splitlines()
+    except FileNotFoundError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_env_file(BASE_DIR / ".env")
 JSON_PATH = BASE_DIR / "sc" / "streamcontrol.json"
 ROUND_CSV_PATH = BASE_DIR / "sc" / "round.csv"
 CONTROL_HTML_PATH = BASE_DIR / "control.html"
 
 PORT = int(os.environ.get("PORT", 8080))
+QUEUE_CONFIG_PATH = BASE_DIR / "sc" / "streamqueue.json"
+STARTGG_TOKEN = os.environ.get("STARTGG_TOKEN", "").strip()
+STREAM_QUEUE_REFRESH_SECONDS = int(os.environ.get("STREAM_QUEUE_REFRESH_SECONDS", "30"))
 
 EVENT_CSV_HEADER = [
     "timestamp", "event_type", "event_name", "game", "round",
@@ -59,6 +85,10 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_get_data()
         elif self.path == "/api/rounds":
             self._handle_get_rounds()
+        elif self.path == "/api/streamqueue/config":
+            self._handle_streamqueue_config()
+        elif self.path == "/api/streamqueue":
+            self._handle_get_streamqueue()
         else:
             self.send_json(404, {"error": "Not found"})
 
@@ -67,6 +97,10 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_post_update()
         elif self.path == "/api/log-event":
             self._handle_log_event()
+        elif self.path == "/api/streamqueue/tournament":
+            self._handle_post_tournament()
+        elif self.path == "/api/streamqueue/station":
+            self._handle_post_station()
         else:
             self.send_json(404, {"error": "Not found"})
 
@@ -148,6 +182,68 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"ok": True, "file": filename})
         except Exception as e:
             self.send_json(500, {"error": str(e)})
+
+    # ---------- Stream queue ----------
+
+    def _read_json_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        return json.loads(self.rfile.read(length) or b"{}")
+
+    def _require_token(self):
+        if not STARTGG_TOKEN:
+            self.send_json(403, {"error": "Stream queue disabled (no STARTGG_TOKEN)"})
+            return False
+        return True
+
+    def _handle_streamqueue_config(self):
+        cfg = startgg.load_queue_config(QUEUE_CONFIG_PATH)
+        self.send_json(200, startgg.build_config_response(
+            STARTGG_TOKEN, STREAM_QUEUE_REFRESH_SECONDS, cfg))
+
+    def _handle_get_streamqueue(self):
+        if not self._require_token():
+            return
+        cfg = startgg.load_queue_config(QUEUE_CONFIG_PATH)
+        if not cfg.get("slug"):
+            self.send_json(409, {"error": "No tournament loaded"})
+            return
+        try:
+            stations = startgg.fetch_stream_queue(cfg["slug"], STARTGG_TOKEN)
+            self.send_json(200, {"stations": stations, "streamName": cfg.get("streamName")})
+        except startgg.StreamQueueError as e:
+            self.send_json(502, {"error": str(e)})
+
+    def _handle_post_tournament(self):
+        if not self._require_token():
+            return
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        slug = startgg.parse_slug(body.get("url", ""))
+        if not slug:
+            self.send_json(400, {"error": "Could not parse tournament URL"})
+            return
+        startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": slug, "streamName": None})
+        try:
+            stations = startgg.fetch_stream_queue(slug, STARTGG_TOKEN)
+            self.send_json(200, {"slug": slug, "stations": stations, "streamName": None})
+        except startgg.StreamQueueError as e:
+            self.send_json(502, {"error": str(e)})
+
+    def _handle_post_station(self):
+        if not self._require_token():
+            return
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        cfg = startgg.load_queue_config(QUEUE_CONFIG_PATH)
+        cfg["streamName"] = body.get("streamName")
+        startgg.save_queue_config(QUEUE_CONFIG_PATH, cfg)
+        self.send_json(200, {"ok": True, "streamName": cfg["streamName"]})
 
 
 if __name__ == "__main__":

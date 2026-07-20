@@ -63,6 +63,28 @@ Then open **http://localhost:8080** in any browser. No dependencies required —
 | Variable | Default | Description |
 |---|---|---|
 | `PORT` | `8080` | Port the dashboard server listens on |
+| `STARTGG_TOKEN` | _(empty)_ | start.gg API bearer token. Empty ⇒ stream queue hidden |
+| `STREAM_QUEUE_REFRESH_SECONDS` | `30` | How often the stream queue auto-refreshes |
+
+### Start.gg Stream Queue
+
+The control dashboard can pull upcoming matches from a tournament's start.gg
+stream queue so you don't have to type player names by hand.
+
+Set these in your `.env`:
+
+- `STARTGG_TOKEN` — a start.gg API token (bearer). **If this is empty the
+  stream-queue section is hidden entirely.** The token is only ever used
+  server-side and is never sent to the browser.
+- `STREAM_QUEUE_REFRESH_SECONDS` — how often the queue auto-refreshes
+  (default `30`).
+
+In the dashboard, paste your tournament URL
+(e.g. `https://www.start.gg/tournament/your-tournament/details`) and click
+**Load tournament**. Upcoming matches appear as cards; pick a stream station if
+your event has more than one. Clicking a card fills in the round and player
+names and resets the score to 0:0 — review it, then press **Submit**. The queue
+also refreshes on its own and via the **Refresh** button.
 
 ---
 
