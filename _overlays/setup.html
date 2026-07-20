@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @font-face {
+      src: url('fonts/ValorantFont.ttf');
+      font-family: "Valorant";
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: "Valorant";
+      color: white;
+      text-transform: uppercase;
+      background:
+        radial-gradient(ellipse at 50% 38%, rgba(255, 140, 0, 0.08) 0%, transparent 58%),
+        radial-gradient(circle, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        #0d0d0d;
+      background-size: auto, 44px 44px, auto;
+    }
+
+    /* ── Header ── */
+    #header {
+      position: absolute;
+      left: 0; top: 0;
+      width: 1920px; height: 130px;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex;
+      align-items: center;
+      padding: 0 40px;
+      gap: 0;
+      z-index: 10;
+    }
+
+    #logo {
+      height: 108px;
+      width: auto;
+      flex-shrink: 0;
+    }
+
+    #headerCenter {
+      flex: 1;
+      text-align: center;
+    }
+
+    #eventName {
+      display: block;
+      font-size: 34px;
+      color: #e91e8c;
+      text-shadow: 0 0 24px rgba(233, 30, 140, 0.55), 2px 2px 0 rgba(0, 0, 0, 0.9);
+      letter-spacing: 0.07em;
+      line-height: 1.1;
+    }
+
+    #eventDate {
+      display: block;
+      font-size: 18px;
+      color: #00e5ff;
+      text-shadow: 0 0 16px rgba(0, 229, 255, 0.5), 1px 1px 0 rgba(0, 0, 0, 0.9);
+      margin-top: 6px;
+      letter-spacing: 0.14em;
+    }
+
+    /* invisible right spacer to optically centre the text */
+    #headerSpacer { flex-shrink: 0; width: 220px; }
+
+    /* ── Separator bars ── */
+    #sep1 {
+      position: absolute;
+      top: 130px; left: 0;
+      width: 1920px; height: 4px;
+      background: linear-gradient(to right,
+        transparent 0%,
+        #e91e8c 20%,
+        #00e5ff 80%,
+        transparent 100%);
+      z-index: 10;
+    }
+
+    #sep2 {
+      position: absolute;
+      top: 136px; left: 0;
+      width: 1920px; height: 2px;
+      background: linear-gradient(to right,
+        transparent 10%,
+        rgba(255, 160, 0, 0.35) 35%,
+        rgba(255, 160, 0, 0.35) 65%,
+        transparent 90%);
+      z-index: 10;
+    }
+
+    /* ── Panels ── */
+    .panel {
+      position: absolute;
+      width: 900px;
+      height: 506px;
+      top: 155px;
+      border: 2px solid #e91e8c;
+      box-shadow:
+        0 0 0 1px rgba(233, 30, 140, 0.2),
+        0 0 28px rgba(233, 30, 140, 0.22),
+        inset 0 0 20px rgba(233, 30, 140, 0.04);
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    #leftPanel  { left: 40px; }
+    #rightPanel { left: 980px; }
+
+    /* Panel corner accent (orange) */
+    .panel::before, .panel::after {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      border-color: #ffa500;
+      border-style: solid;
+      opacity: 0.6;
+    }
+    .panel::before { bottom: -2px; right: -2px; border-width: 0 2px 2px 0; }
+    .panel::after  { bottom: -2px; left:  -2px; border-width: 0 0 2px 2px; }
+
+    .panel-label {
+      position: absolute;
+      top: 12px;
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      opacity: 0.7;
+    }
+
+    #leftPanel  .panel-label { left: 14px; color: #e91e8c; text-shadow: 0 0 8px rgba(233,30,140,0.6); }
+    #rightPanel .panel-label { left: 14px; color: #00e5ff; text-shadow: 0 0 8px rgba(0,229,255,0.6); }
+
+    /* ── VS section ── */
+    #sepBottom {
+      position: absolute;
+      top: 675px; left: 0;
+      width: 1920px; height: 1px;
+      background: linear-gradient(to right,
+        transparent,
+        rgba(255, 255, 255, 0.07) 20%,
+        rgba(255, 255, 255, 0.07) 80%,
+        transparent);
+    }
+
+    #vsSection {
+      position: absolute;
+      top: 685px;
+      width: 1920px;
+      text-align: center;
+    }
+
+    #vsLine {
+      font-size: 52px;
+      line-height: 1.1;
+    }
+
+    #p1NameDisplay {
+      color: #e91e8c;
+      text-shadow: 0 0 22px rgba(233, 30, 140, 0.45), 2px 2px 0 rgba(0, 0, 0, 0.8);
+    }
+
+    #vsSeparator {
+      color: #ffa500;
+      text-shadow: 0 0 18px rgba(255, 160, 0, 0.45);
+      font-size: 36px;
+      vertical-align: middle;
+      margin: 0 28px;
+    }
+
+    #p2NameDisplay {
+      color: #00e5ff;
+      text-shadow: 0 0 22px rgba(0, 229, 255, 0.45), 2px 2px 0 rgba(0, 0, 0, 0.8);
+    }
+
+    #roundDisplay {
+      margin-top: 12px;
+      font-size: 19px;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.14em;
+    }
+
+    /* ── Bottom accent line ── */
+    #sepFooter {
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 1920px; height: 3px;
+      background: linear-gradient(to right,
+        transparent 0%,
+        #e91e8c 25%,
+        #00e5ff 75%,
+        transparent 100%);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">
+    <img id="logo" src="imgs/fgc_hamburg_transp.png" alt="FGC Hamburg">
+    <div id="headerCenter">
+      <span id="eventName">FGC Hamburg</span>
+      <span id="eventDate">2026-05-01</span>
+    </div>
+    <div id="headerSpacer"></div>
+  </div>
+
+  <!-- Separator bars -->
+  <div id="sep1"></div>
+  <div id="sep2"></div>
+
+  <!-- Left panel: player cam -->
+  <div id="leftPanel" class="panel">
+    <span class="panel-label">&#9654; Player Cam</span>
+  </div>
+
+  <!-- Right panel: game feed -->
+  <div id="rightPanel" class="panel">
+    <span class="panel-label">&#9654; Game Feed</span>
+  </div>
+
+  <!-- VS section -->
+  <div id="sepBottom"></div>
+  <div id="vsSection">
+    <div id="vsLine">
+      <span id="p1NameDisplay">Player 1</span>
+      <span id="vsSeparator">vs</span>
+      <span id="p2NameDisplay">Player 2</span>
+    </div>
+    <div id="roundDisplay"></div>
+  </div>
+
+  <!-- Bottom accent -->
+  <div id="sepFooter"></div>
+
+  <script>
+    var cBust = 0;
+
+    function pollJSON() {
+      var xhr = new XMLHttpRequest();
+      xhr.overrideMimeType('application/json');
+      xhr.open('GET', '../sc/streamcontrol.json?v=cBust' + cBust, true);
+      cBust++;
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          try { updateUI(JSON.parse(xhr.responseText)); } catch (e) {}
+        }
+      };
+      xhr.send();
+    }
+
+    function todayISO() {
+      return new Date().toISOString().split('T')[0];
+    }
+
+    function updateUI(d) {
+      document.getElementById('eventName').textContent     = d.mText1 || 'FGC Hamburg';
+      document.getElementById('eventDate').textContent     = d.mText2 || todayISO();
+      document.getElementById('p1NameDisplay').textContent = d.p1Name || 'Player 1';
+      document.getElementById('p2NameDisplay').textContent = d.p2Name || 'Player 2';
+      document.getElementById('roundDisplay').textContent  = d.round  || '';
+    }
+
+    setInterval(pollJSON, 500);
+    pollJSON();
+  </script>
+</body>
+</html>
