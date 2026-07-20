@@ -11,10 +11,13 @@
     <div id="leftBGWrapper" class="BGWrapper">
         <div id="p1ScoreBG" class="scoreBG p1s-animation"></div>
         <div id="p1PlayerBG" class="playerBG player1-animation"></div>
+        <!-- duplicated name bar for the optional 2nd player (2XKO), no extra score box -->
+        <div id="p1PlayerBG2" class="playerBG playerBG2"></div>
     </div>
     <div id="rightBGWrapper" class="BGWrapper">
         <div id="p2ScoreBG" class="scoreBG p2s-animation"></div>
         <div id="p2PlayerBG" class="playerBG player2-animation"></div>
+        <div id="p2PlayerBG2" class="playerBG playerBG2"></div>
     </div>
 </div>
 
@@ -26,12 +29,21 @@
             <!-- team/name spans nested within wrapper span to allow them to align the same without overlapping each other -->
 					<span id="p1Name" class="names"></span>
 				</span>
+        <!-- optional 2nd player row, only shown for 2XKO when a 2nd name is set -->
+        <span id="p1Wrapper2" class="wrappers wrappers2">
+					<span id="p1Team2" class="teams"></span>
+					<span id="p1Name2" class="names"></span>
+				</span>
     </div>
     <div id="rightWrapper">
         <span id="p2Score" class="scores"></span>
         <span id="p2Wrapper" class="wrappers">
 					<span id="p2Team" class="teams"></span>
 					<span id="p2Name" class="names"></span>
+				</span>
+        <span id="p2Wrapper2" class="wrappers wrappers2">
+					<span id="p2Team2" class="teams"></span>
+					<span id="p2Name2" class="names"></span>
 				</span>
     </div>
     <div id="rdWrapper">

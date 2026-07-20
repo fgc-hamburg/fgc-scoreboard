@@ -3,9 +3,13 @@
     "mText2": "2026-07-03",
     "p1Name": "FGC Hamburg",
     "p1Team": "",
+    "p1Name2": "This one has two!",
+    "p1Team2": "FGC HH",
     "p1Score": "6",
-    "p2Name": "FGC Hamburg",
+    "p2Name": "Solo player",
     "p2Team": "",
+    "p2Name2": "SSSSSS",
+    "p2Team2": "",
     "p2Score": "7",
     "round": "FGC Hamburg - Casual Sets",
     "game": "SF6",
@@ -13,5 +17,5 @@
     "cTitle2": "",
     "mText3": "",
     "mText4": "",
-    "timestamp": "1783109353"
+    "timestamp": "1784585220"
 }

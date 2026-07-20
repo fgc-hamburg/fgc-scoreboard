@@ -41,7 +41,7 @@ function init(){
 			game = scObj['game'];
 			$('#gameHold').html(game); //sets 'game' value into placeholder div
 
-			if(game == 'BBTAG' || game == 'SFVCE' || game == 'TEKKEN7' || game == 'UNICLR'){
+			if(game == '2XKO' || game == 'BBTAG' || game == 'SFVCE' || game == 'TEKKEN7' || game == 'UNICLR'){
 				// Shifts the scoreboard BG wrappers down to match HP bars
 				offset = document.getElementById("leftBGWrapper").offsetTop;
 				TweenMax.fromTo('#leftBGWrapper', 0.5, {css:{y: offset}}, {css:{y: adjust1}})
@@ -65,7 +65,7 @@ function init(){
 				TweenMax.set('#leftWrapper',{css:{y: adjust2}}); //if 'game' value is anything other than specified above it defaults to 2nd webm/placement
 				TweenMax.set('#rightWrapper',{css:{y: adjust2}});
 			}
-			if(game == 'BBTAG' || game == 'UNICLR'){
+			if(game == '2XKO' || game == 'BBTAG' || game == 'UNICLR'){
 				var adjustLgW = parseFloat($('.logos').css('width')) * adjustLg[2]; //shrinks logo sizes based on scaling variable set in scoreboard.html
 				var adjustLgH = parseFloat($('.logos').css('height')) * adjustLg[2];
 				TweenMax.set('.logos',{css:{x: adjustLg[0], y: adjustLg[1], width: adjustLgW, height: adjustLgH}});
@@ -132,9 +132,15 @@ function init(){
 			TweenMax.to('#p2Wrapper',nameTime,{css:{x: '+0px', opacity: 1},ease:Quad.easeOut,delay:nameDelay}); //fading them in, timing/delay based on variables set in scoreboard.html
 			TweenMax.to('#round',rdTime,{css:{y: '+0px', opacity: 1},ease:Quad.easeOut,delay:rdDelay});
 			TweenMax.to('.scores',scTime,{css:{opacity: 1},ease:Quad.easeOut,delay:scDelay});
+
+			refreshSecondRow(1); //populate/reveal optional 2nd-player rows on first paint
+			refreshSecondRow(2);
 		}
 		else{
 			game = scObj['game']; //if this is after the first time that getData function has run, changes the value of the local game variable to current json output
+
+			refreshSecondRow(1); //re-evaluate 2nd-player rows each poll (handles name/team/game changes)
+			refreshSecondRow(2);
 
 			if($('#p1Name').text() != p1Name || $('#p1Team').text() != p1Team){ //if either name or team do not match, fades out wrapper and updates them both
 				TweenMax.to('#p1Wrapper',.3,{css:{x: p1Move, opacity: 0},ease:Quad.easeOut,delay:0,onComplete:function(){ //uses onComplete parameter to execute function after TweenMax
@@ -208,7 +214,7 @@ function init(){
 				TweenMax.to('.logos',.3,{css:{opacity: 0},delay:0,onComplete:function(){ //then execute function
 					$('#gameHold').html(game); //updates gameHold html object with new game dropdown value
 
-					if(game == 'BBTAG' || game == 'SFVCE' || game == 'TEKKEN7' || game == 'UNICLR'){
+					if(game == '2XKO' || game == 'BBTAG' || game == 'SFVCE' || game == 'TEKKEN7' || game == 'UNICLR'){
 						offset = document.getElementById("leftBGWrapper").offsetTop;
 						TweenMax.fromTo('#leftBGWrapper', 0.5, {css:{y: offset}}, {css:{y: adjust1}})
 						TweenMax.fromTo('#rightBGWrapper', 0.5, {css:{y: offset}}, {css:{y: adjust1}})
@@ -229,7 +235,7 @@ function init(){
 						TweenMax.set('#leftWrapper',{css:{y: adjust2}});
 						TweenMax.set('#rightWrapper',{css:{y: adjust2}});
 					}
-					if(game == 'BBTAG' || game == 'UNICLR'){
+					if(game == '2XKO' || game == 'BBTAG' || game == 'UNICLR'){
 						var adjustLgW = parseFloat(adjustLg[3]) * adjustLg[2]; //var changed so that it bases resized on original logo size rather than current value
 						var adjustLgH = parseFloat(adjustLg[4]) * adjustLg[2]; //uses variables stored in the 'adjustLg' array in scoreboard.html
 						TweenMax.set('.logos',{css:{x: adjustLg[0], y: adjustLg[1], width: adjustLgW, height: adjustLgH}});
@@ -246,6 +252,66 @@ function init(){
 					TweenMax.to('.logos',.3,{css:{opacity: .7},delay:.3}); //TweenMax to fade logos back in, note to fade them to same opacity as default in CSS
 				}});
 			}
+		}
+	}
+
+	var nameSize2 = '22px'; //default font size of 2nd-player rows, should match 'font-size' of .wrappers2
+
+	function shrinkToFit(el){ //shrinks font-size until text no longer overflows its box (same approach as primary rows)
+		while(el.scrollWidth > el.offsetWidth || el.scrollHeight > el.offsetHeight){
+			var newFontSize = (parseFloat($(el).css('font-size').slice(0,-2)) * .95) + 'px';
+			$(el).css('font-size', newFontSize);
+		}
+	}
+
+	function refreshSecondRow(side){ //shows/updates/hides the optional 2nd-player row for a side (2XKO only)
+		var g = scObj['game'];
+		var name2 = scObj['p'+side+'Name2'] || '';
+		var team2 = scObj['p'+side+'Team2'] || '';
+		var show = (g == '2XKO' && name2 !== ''); //per-side rule: 2XKO selected AND this side has a 2nd name
+		var wrapSel = '#p'+side+'Wrapper2';
+		var nameSel = '#p'+side+'Name2';
+		var teamSel = '#p'+side+'Team2';
+		var barSel  = '#p'+side+'PlayerBG2';
+		var wrapEl = document.getElementById('p'+side+'Wrapper2');
+		var barEl  = document.getElementById('p'+side+'PlayerBG2');
+
+		if(!show){ //hide the bar + row if currently visible, then clear contents
+			if(wrapEl.style.display === 'block'){
+				TweenMax.to(wrapSel,.3,{css:{opacity: 0},delay:0,onComplete:function(){
+					wrapEl.style.display = 'none';
+					$(nameSel).html('');
+					$(teamSel).html('');
+				}});
+				TweenMax.to(barSel,.3,{css:{opacity: 0},delay:0,onComplete:function(){
+					barEl.style.display = 'none';
+				}});
+			}
+			return;
+		}
+
+		var wasHidden = (wrapEl.style.display !== 'block');
+		var changed = ($(nameSel).text() != name2 || $(teamSel).text() != team2);
+
+		if(wasHidden){ //first appearance: reveal the duplicated bar, set content, then fade in
+			barEl.style.display = 'block';
+			TweenMax.fromTo(barSel,.3,{css:{opacity: 0}},{css:{opacity: 1},delay:0});
+
+			$(wrapSel).css('font-size', nameSize2);
+			$(nameSel).html(name2);
+			$(teamSel).html(team2);
+			wrapEl.style.display = 'block';
+			shrinkToFit(wrapEl);
+			TweenMax.fromTo(wrapSel,.3,{css:{opacity: 0}},{css:{opacity: 1},delay:0});
+		}
+		else if(changed){ //content changed while visible: fade out, update, fade back in
+			TweenMax.to(wrapSel,.3,{css:{opacity: 0},delay:0,onComplete:function(){
+				$(wrapSel).css('font-size', nameSize2);
+				$(nameSel).html(name2);
+				$(teamSel).html(team2);
+				shrinkToFit(wrapEl);
+				TweenMax.to(wrapSel,.3,{css:{opacity: 1},delay:.2});
+			}});
 		}
 	}
 

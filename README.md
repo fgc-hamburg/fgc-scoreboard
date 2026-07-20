@@ -18,6 +18,7 @@ To change any of the colors, the font, the opacity, etc. just open the scss file
 Finally, when you select a game (and hit save) the layout will adjust so that the scores and logos don't cover important guages.
 #### Supported Games
 ```
+* 2XKO
 * BBCF
 * BBTAG
 * DBFZ
@@ -30,6 +31,12 @@ Finally, when you select a game (and hit save) the layout will adjust so that th
 * UNICLR
 * USF4
 ```
+
+`2XKO` is a tag game where each side may be played by two people at once. When it is
+selected in the control dashboard, an optional **2nd player** (name + team/sponsor) can be
+added to either side. If a side's 2nd name is filled in, that player is shown on a second row
+beneath the first in both the scoreboard and the VS/setup overlay. Leaving it blank keeps the
+side to a single name.
 
 ## Control Dashboard
 

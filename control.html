@@ -52,6 +52,25 @@
       color: #888;
     }
 
+    /* 2nd player block (2XKO) — hidden unless the game is 2XKO */
+    .player-2nd {
+      display: none;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding-top: 0.75rem;
+      margin-top: 0.25rem;
+      border-top: 1px dashed #3a3a3a;
+    }
+
+    .player-2nd.visible { display: flex; }
+
+    .player-2nd h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #6a6a6a;
+    }
+
     label {
       display: flex;
       flex-direction: column;
@@ -220,6 +239,7 @@
       <label>
         Game
         <select id="game">
+          <option value="2XKO">2XKO</option>
           <option value="BBCF">BBCF</option>
           <option value="BBTAG">BBTAG</option>
           <option value="COTW">COTW</option>
@@ -251,6 +271,17 @@
           Team / Sponsor
           <input type="text" id="p1Team" placeholder="Team">
         </label>
+        <div class="player-2nd" id="p1Second">
+          <h3>2nd Player (2XKO)</h3>
+          <label>
+            Name
+            <input type="text" id="p1Name2" placeholder="Player 1 (2nd)">
+          </label>
+          <label>
+            Team / Sponsor
+            <input type="text" id="p1Team2" placeholder="Team">
+          </label>
+        </div>
         <label>Score</label>
         <div class="score-row">
           <div class="score-display" id="p1ScoreDisplay">0</div>
@@ -273,6 +304,17 @@
           Team / Sponsor
           <input type="text" id="p2Team" placeholder="Team">
         </label>
+        <div class="player-2nd" id="p2Second">
+          <h3>2nd Player (2XKO)</h3>
+          <label>
+            Name
+            <input type="text" id="p2Name2" placeholder="Player 2 (2nd)">
+          </label>
+          <label>
+            Team / Sponsor
+            <input type="text" id="p2Team2" placeholder="Team">
+          </label>
+        </div>
         <label>Score</label>
         <div class="score-row">
           <div class="score-display" id="p2ScoreDisplay">0</div>
@@ -307,8 +349,8 @@
     // Local state — tracks what's in the UI (not yet submitted)
     const state = {
       eventName: "", eventDate: "",
-      p1Name: "", p1Team: "", p1Score: 0,
-      p2Name: "", p2Team: "", p2Score: 0,
+      p1Name: "", p1Team: "", p1Name2: "", p1Team2: "", p1Score: 0,
+      p2Name: "", p2Team: "", p2Name2: "", p2Team2: "", p2Score: 0,
       round: "", game: "GGXRD"
     };
 
@@ -366,9 +408,13 @@
       state.eventDate = data.mText2 || todayISO();
       state.p1Name  = data.p1Name  ?? "";
       state.p1Team  = data.p1Team  ?? "";
+      state.p1Name2 = data.p1Name2 ?? "";
+      state.p1Team2 = data.p1Team2 ?? "";
       state.p1Score = parseInt(data.p1Score ?? "0", 10) || 0;
       state.p2Name  = data.p2Name  ?? "";
       state.p2Team  = data.p2Team  ?? "";
+      state.p2Name2 = data.p2Name2 ?? "";
+      state.p2Team2 = data.p2Team2 ?? "";
       state.p2Score = parseInt(data.p2Score ?? "0", 10) || 0;
       state.round   = data.round   ?? "";
       state.game    = data.game    ?? "GGXRD";
@@ -381,8 +427,12 @@
       document.getElementById("eventDate").value = state.eventDate;
       document.getElementById("p1Name").value  = state.p1Name;
       document.getElementById("p1Team").value  = state.p1Team;
+      document.getElementById("p1Name2").value = state.p1Name2;
+      document.getElementById("p1Team2").value = state.p1Team2;
       document.getElementById("p2Name").value  = state.p2Name;
       document.getElementById("p2Team").value  = state.p2Team;
+      document.getElementById("p2Name2").value = state.p2Name2;
+      document.getElementById("p2Team2").value = state.p2Team2;
       document.getElementById("round").value   = state.round;
       document.getElementById("p1ScoreDisplay").textContent = state.p1Score;
       document.getElementById("p2ScoreDisplay").textContent = state.p2Score;
@@ -390,6 +440,15 @@
       const gameEl = document.getElementById("game");
       const opt = [...gameEl.options].find(o => o.value === state.game);
       if (opt) gameEl.value = state.game;
+
+      toggle2XKO();
+    }
+
+    // Show the 2nd-player inputs only when the 2XKO game is selected
+    function toggle2XKO() {
+      const on = document.getElementById("game").value === "2XKO";
+      document.getElementById("p1Second").classList.toggle("visible", on);
+      document.getElementById("p2Second").classList.toggle("visible", on);
     }
 
     // ---------- Score controls ----------
@@ -419,6 +478,8 @@
     function swapPlayers() {
       [state.p1Name, state.p2Name]   = [state.p2Name, state.p1Name];
       [state.p1Team, state.p2Team]   = [state.p2Team, state.p1Team];
+      [state.p1Name2, state.p2Name2] = [state.p2Name2, state.p1Name2];
+      [state.p1Team2, state.p2Team2] = [state.p2Team2, state.p1Team2];
       [state.p1Score, state.p2Score] = [state.p2Score, state.p1Score];
       renderAll();
       setDirty(true);
@@ -432,16 +493,24 @@
       state.eventDate = document.getElementById("eventDate").value.trim();
       state.p1Name = document.getElementById("p1Name").value.trim();
       state.p1Team = document.getElementById("p1Team").value.trim();
+      state.p1Name2 = document.getElementById("p1Name2").value.trim();
+      state.p1Team2 = document.getElementById("p1Team2").value.trim();
       state.p2Name = document.getElementById("p2Name").value.trim();
       state.p2Team = document.getElementById("p2Team").value.trim();
+      state.p2Name2 = document.getElementById("p2Name2").value.trim();
+      state.p2Team2 = document.getElementById("p2Team2").value.trim();
       state.round  = document.getElementById("round").value.trim();
       state.game   = document.getElementById("game").value;
     }
 
     // Track input edits as dirty
-    ["eventName", "eventDate", "p1Name", "p1Team", "p2Name", "p2Team", "round", "game"].forEach(id => {
+    ["eventName", "eventDate", "p1Name", "p1Team", "p1Name2", "p1Team2",
+     "p2Name", "p2Team", "p2Name2", "p2Team2", "round", "game"].forEach(id => {
       document.getElementById(id).addEventListener("input", () => setDirty(true));
     });
+
+    // Toggle the 2nd-player inputs when the game changes
+    document.getElementById("game").addEventListener("change", toggle2XKO);
 
     // Enter on any text input submits
     document.querySelectorAll("input[type=text]").forEach(el => {
@@ -457,9 +526,13 @@
         mText2:  state.eventDate,
         p1Name:  state.p1Name,
         p1Team:  state.p1Team,
+        p1Name2: state.p1Name2,
+        p1Team2: state.p1Team2,
         p1Score: String(state.p1Score),
         p2Name:  state.p2Name,
         p2Team:  state.p2Team,
+        p2Name2: state.p2Name2,
+        p2Team2: state.p2Team2,
         p2Score: String(state.p2Score),
         round:   state.round,
         game:    state.game,

@@ -31,6 +31,16 @@ body {
     left: 456px; }
   body #p2Wrapper {
     left: 1116px; }
+  body .wrappers2 {
+    top: 72px;
+    height: 36px;
+    line-height: 36px;
+    font-size: 22px;
+    display: none; }
+  body #p1Wrapper2 {
+    left: 456px; }
+  body #p2Wrapper2 {
+    left: 1116px; }
   body .scores {
     position: absolute;
     width: 41px;
@@ -119,6 +129,15 @@ body {
     animation-duration: 0.26s; }
   body #p2ScoreBG {
     left: 375px;
+    transform: skewX(-20deg); }
+  body .playerBG2 {
+    top: 40px;
+    display: none;
+    opacity: 0; }
+  body #p1PlayerBG2 {
+    left: 50px;
+    transform: skewX(20deg); }
+  body #p2PlayerBG2 {
     transform: skewX(-20deg); }
   body .p2s-animation {
     animation-name: p2score;

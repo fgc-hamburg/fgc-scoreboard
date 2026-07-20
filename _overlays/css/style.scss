@@ -49,6 +49,23 @@ body {
     left: 1116px;
   }
 
+  /* optional 2nd player row (2XKO) — sits just below the primary name plate */
+  .wrappers2 {
+    top: 72px;
+    height: 36px;
+    line-height: 36px;
+    font-size: 22px;
+    display: none;
+  }
+
+  #p1Wrapper2 {
+    left: 456px;
+  }
+
+  #p2Wrapper2 {
+    left: 1116px;
+  }
+
   .scores {
     position: absolute;
     width: 41px;
@@ -175,6 +192,22 @@ body {
 
   #p2ScoreBG {
     left: 375px;
+    transform: skewX(-20deg);
+  }
+
+  /* duplicated name bar for the 2nd player row (2XKO) — sits below the primary bar */
+  .playerBG2 {
+    top: 40px;
+    display: none;
+    opacity: 0;
+  }
+
+  #p1PlayerBG2 {
+    left: 50px;
+    transform: skewX(20deg);
+  }
+
+  #p2PlayerBG2 {
     transform: skewX(-20deg);
   }
 

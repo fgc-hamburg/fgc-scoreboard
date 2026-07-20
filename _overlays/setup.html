@@ -176,6 +176,32 @@
       text-shadow: 0 0 22px rgba(0, 229, 255, 0.45), 2px 2px 0 rgba(0, 0, 0, 0.8);
     }
 
+    /* each side stacks its player names (2XKO can have two per side) */
+    .vsSide {
+      display: inline-block;
+      vertical-align: middle;
+      text-align: center;
+    }
+
+    #p1NameDisplay, #p2NameDisplay { display: block; }
+
+    /* optional 2nd player name — hidden unless 2XKO with a 2nd name set */
+    .nameSecondary {
+      display: none;
+      font-size: 34px;
+      margin-top: 8px;
+    }
+
+    #p1NameDisplay2 {
+      color: #e91e8c;
+      text-shadow: 0 0 22px rgba(233, 30, 140, 0.45), 2px 2px 0 rgba(0, 0, 0, 0.8);
+    }
+
+    #p2NameDisplay2 {
+      color: #00e5ff;
+      text-shadow: 0 0 22px rgba(0, 229, 255, 0.45), 2px 2px 0 rgba(0, 0, 0, 0.8);
+    }
+
     #roundDisplay {
       margin-top: 12px;
       font-size: 19px;
@@ -226,9 +252,15 @@
   <div id="sepBottom"></div>
   <div id="vsSection">
     <div id="vsLine">
-      <span id="p1NameDisplay">Player 1</span>
+      <span class="vsSide">
+        <span id="p1NameDisplay">Player 1</span>
+        <span id="p1NameDisplay2" class="nameSecondary"></span>
+      </span>
       <span id="vsSeparator">vs</span>
-      <span id="p2NameDisplay">Player 2</span>
+      <span class="vsSide">
+        <span id="p2NameDisplay">Player 2</span>
+        <span id="p2NameDisplay2" class="nameSecondary"></span>
+      </span>
     </div>
     <div id="roundDisplay"></div>
   </div>
@@ -262,6 +294,17 @@
       document.getElementById('p1NameDisplay').textContent = d.p1Name || 'Player 1';
       document.getElementById('p2NameDisplay').textContent = d.p2Name || 'Player 2';
       document.getElementById('roundDisplay').textContent  = d.round  || '';
+
+      setSecondName('p1NameDisplay2', d.game, d.p1Name2);
+      setSecondName('p2NameDisplay2', d.game, d.p2Name2);
+    }
+
+    // Show a side's 2nd player name only for 2XKO when a name is set
+    function setSecondName(id, game, name2) {
+      var show = game === '2XKO' && name2;
+      var el = document.getElementById(id);
+      el.textContent = show ? name2 : '';
+      el.style.display = show ? 'block' : 'none';
     }
 
     setInterval(pollJSON, 500);
