@@ -86,6 +86,13 @@ your event has more than one. Clicking a card fills in the round and player
 names and resets the score to 0:0 — review it, then press **Submit**. The queue
 also refreshes on its own and via the **Refresh** button.
 
+Once a match is loaded from the queue, set the final score and click **Report to
+start.gg** to submit the result to the bracket (the winner is the higher score).
+You'll be asked to confirm first, and the queue refreshes afterward. The button
+is only active for a match loaded from the queue; editing a player's name
+unbinds it (click the card again to re-enable). Sponsor tags from start.gg are
+filled into the Team/Sponsor field automatically.
+
 ---
 
 
