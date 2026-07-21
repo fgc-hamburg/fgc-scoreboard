@@ -235,7 +235,10 @@
       font-size: 0.85rem; text-transform: uppercase;
       letter-spacing: 0.08em; color: #888;
     }
+    .queue-header-actions { display: flex; gap: 0.6rem; align-items: center; }
     .queue-controls { display: flex; gap: 0.6rem; align-items: center; }
+    .btn-change { background: #5a2020; color: #e0b3b3; font-size: 0.8rem; }
+    .btn-change:hover { background: #7a2828; }
     .queue-setup { display: flex; gap: 0.75rem; align-items: flex-end; }
     .queue-setup label { flex: 1; }
     .btn-load { background: #1e3a5f; color: #9dc3e6; padding: 0.5rem 0.9rem; white-space: nowrap; }
@@ -263,6 +266,12 @@
     .match-card .players { font-size: 0.95rem; color: #e5e5e5; }
     .match-card .vs { color: #666; margin: 0 0.4rem; font-size: 0.8rem; }
     .queue-empty { color: #888; font-size: 0.85rem; }
+    .btn-report {
+      background: #6d3aad; color: #fff; font-size: 0.9rem;
+      padding: 0.6rem 1.1rem; font-weight: 600;
+    }
+    .btn-report:hover:not(:disabled) { background: #7d47c4; }
+    .btn-report:disabled { opacity: 0.4; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -385,6 +394,8 @@
       <span id="status"></span>
       <span class="dirty-dot" id="dirtyDot" title="Unsaved changes"></span>
       <button class="btn-swap" onclick="swapPlayers()">&#8646; Swap</button>
+      <button class="btn-report" id="reportBtn" onclick="reportSet()"
+              style="display:none;" disabled>Report to start.gg</button>
       <button class="btn-submit" onclick="submitData()">Submit</button>
     </div>
 
@@ -392,9 +403,13 @@
     <div class="queue-section" id="queueSection" style="display:none;">
       <div class="queue-header">
         <h2>Stream Queue</h2>
-        <div class="queue-controls" id="queueControls" style="display:none;">
-          <select id="queueStation"></select>
-          <button class="btn-refresh" onclick="refreshQueue()">&#8635; Refresh</button>
+        <div class="queue-header-actions">
+          <div class="queue-controls" id="queueControls" style="display:none;">
+            <select id="queueStation"></select>
+            <button class="btn-refresh" onclick="refreshQueue()">&#8635; Refresh</button>
+          </div>
+          <button class="btn-change" id="changeTourneyBtn" onclick="changeTournament()"
+                  style="display:none;">Change tournament</button>
         </div>
       </div>
 
@@ -510,6 +525,7 @@
       if (opt) gameEl.value = state.game;
 
       toggle2XKO();
+      updateReportButton();
     }
 
     // Show the 2nd-player inputs only when the 2XKO game is selected
@@ -549,6 +565,9 @@
       [state.p1Name2, state.p2Name2] = [state.p2Name2, state.p1Name2];
       [state.p1Team2, state.p2Team2] = [state.p2Team2, state.p1Team2];
       [state.p1Score, state.p2Score] = [state.p2Score, state.p1Score];
+      if (activeSet) {
+        [activeSet.p1Id, activeSet.p2Id] = [activeSet.p2Id, activeSet.p1Id];
+      }
       renderAll();
       setDirty(true);
       logEvent("swap");
@@ -575,6 +594,14 @@
     ["eventName", "eventDate", "p1Name", "p1Team", "p1Name2", "p1Team2",
      "p2Name", "p2Team", "p2Name2", "p2Team2", "round", "game"].forEach(id => {
       document.getElementById(id).addEventListener("input", () => setDirty(true));
+    });
+
+    // Editing a player name unbinds the loaded bracket set (disables Report)
+    ["p1Name", "p2Name"].forEach(id => {
+      document.getElementById(id).addEventListener("input", () => {
+        activeSet = null;
+        updateReportButton();
+      });
     });
 
     // Toggle the 2nd-player inputs when the game changes
@@ -681,6 +708,7 @@
     let queueConfig = { enabled: false, refreshSeconds: 30 };
     let queueStations = [];
     let queueTimer = null;
+    let activeSet = null;   // {setId, p1Id, p2Id} for the loaded queue match
 
     async function initQueue() {
       try {
@@ -690,8 +718,10 @@
       if (!queueConfig.enabled) return;         // feature off — stay hidden
 
       document.getElementById("queueSection").style.display = "flex";
+      updateReportButton();
       if (queueConfig.slug) {
         document.getElementById("queueSetup").style.display = "none";
+        document.getElementById("changeTourneyBtn").style.display = "";
         await refreshQueue();
         startQueueTimer();
       }
@@ -719,11 +749,39 @@
         queueConfig.streamName = data.streamName;
         queueStations = data.stations || [];
         document.getElementById("queueSetup").style.display = "none";
+        document.getElementById("changeTourneyBtn").style.display = "";
         renderStations();
         startQueueTimer();
       } catch (e) {
         setQueueError("Network error: " + e.message);
       }
+    }
+
+    async function changeTournament() {
+      if (!confirm("Change tournament? This clears the loaded stream queue.")) return;
+      try {
+        const res = await fetch("/api/streamqueue/clear", { method: "POST" });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setQueueError(d.error || "Failed to clear tournament");
+          return;
+        }
+      } catch (e) {
+        setQueueError("Network error: " + e.message);
+        return;
+      }
+      if (queueTimer) { clearInterval(queueTimer); queueTimer = null; }
+      queueConfig.slug = null;
+      queueConfig.streamName = null;
+      queueStations = [];
+      activeSet = null;
+      updateReportButton();
+      document.getElementById("queueCards").innerHTML = "";
+      document.getElementById("queueControls").style.display = "none";
+      document.getElementById("changeTourneyBtn").style.display = "none";
+      document.getElementById("queueSetup").style.display = "flex";
+      document.getElementById("tourneyUrl").value = "";
+      setQueueError("");
     }
 
     async function refreshQueue() {
@@ -803,11 +861,51 @@
       state.round  = set.fullRoundText || "";
       state.p1Score = 0;
       state.p2Score = 0;
-      // Clear team & 2nd-player fields — the queue doesn't provide them
-      state.p1Team = ""; state.p1Name2 = ""; state.p1Team2 = "";
-      state.p2Team = ""; state.p2Name2 = ""; state.p2Team2 = "";
+      state.p1Team = set.p1Team || "";
+      state.p2Team = set.p2Team || "";
+      // Clear 2XKO 2nd-player fields — the queue doesn't provide them
+      state.p1Name2 = ""; state.p1Team2 = "";
+      state.p2Name2 = ""; state.p2Team2 = "";
+      activeSet = (set.setId && set.p1Id != null && set.p2Id != null)
+        ? { setId: set.setId, p1Id: set.p1Id, p2Id: set.p2Id } : null;
       renderAll();
       setDirty(true);
+    }
+
+    function updateReportButton() {
+      const btn = document.getElementById("reportBtn");
+      if (!btn) return;
+      btn.style.display = queueConfig.enabled ? "" : "none";
+      btn.disabled = !activeSet;
+    }
+
+    async function reportSet() {
+      if (!activeSet) return;
+      readFields();
+      const p1 = state.p1Score, p2 = state.p2Score;
+      if (p1 === p2) { showStatus("Can't report: scores are tied.", "err"); return; }
+      if (p1 === 0 && p2 === 0) { showStatus("Can't report: no score yet.", "err"); return; }
+      const msg = `Report ${state.p1Name || "P1"} ${p1}–${p2} `
+        + `${state.p2Name || "P2"} to start.gg?`;
+      if (!confirm(msg)) return;
+      try {
+        const res = await fetch("/api/streamqueue/report", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            setId: activeSet.setId, p1Id: activeSet.p1Id, p2Id: activeSet.p2Id,
+            p1Score: p1, p2Score: p2,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) { showStatus("Report failed: " + (data.error || res.status), "err"); return; }
+        showStatus("Reported to start.gg.", "ok");
+        activeSet = null;
+        updateReportButton();
+        refreshQueue();
+      } catch (e) {
+        showStatus("Report failed: " + e.message, "err");
+      }
     }
 
     function setQueueError(msg) {
