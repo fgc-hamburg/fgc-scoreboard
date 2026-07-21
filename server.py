@@ -103,6 +103,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_post_station()
         elif self.path == "/api/streamqueue/report":
             self._handle_post_report()
+        elif self.path == "/api/streamqueue/clear":
+            self._handle_post_clear()
         else:
             self.send_json(404, {"error": "Not found"})
 
@@ -267,6 +269,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, {"ok": True})
         except startgg.StreamQueueError as e:
             self.send_json(502, {"error": str(e)})
+
+    def _handle_post_clear(self):
+        if not self._require_token():
+            return
+        startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": None, "streamName": None})
+        self.send_json(200, {"ok": True})
 
 
 if __name__ == "__main__":

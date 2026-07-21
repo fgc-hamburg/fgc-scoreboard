@@ -235,7 +235,10 @@
       font-size: 0.85rem; text-transform: uppercase;
       letter-spacing: 0.08em; color: #888;
     }
+    .queue-header-actions { display: flex; gap: 0.6rem; align-items: center; }
     .queue-controls { display: flex; gap: 0.6rem; align-items: center; }
+    .btn-change { background: #5a2020; color: #e0b3b3; font-size: 0.8rem; }
+    .btn-change:hover { background: #7a2828; }
     .queue-setup { display: flex; gap: 0.75rem; align-items: flex-end; }
     .queue-setup label { flex: 1; }
     .btn-load { background: #1e3a5f; color: #9dc3e6; padding: 0.5rem 0.9rem; white-space: nowrap; }
@@ -400,9 +403,13 @@
     <div class="queue-section" id="queueSection" style="display:none;">
       <div class="queue-header">
         <h2>Stream Queue</h2>
-        <div class="queue-controls" id="queueControls" style="display:none;">
-          <select id="queueStation"></select>
-          <button class="btn-refresh" onclick="refreshQueue()">&#8635; Refresh</button>
+        <div class="queue-header-actions">
+          <div class="queue-controls" id="queueControls" style="display:none;">
+            <select id="queueStation"></select>
+            <button class="btn-refresh" onclick="refreshQueue()">&#8635; Refresh</button>
+          </div>
+          <button class="btn-change" id="changeTourneyBtn" onclick="changeTournament()"
+                  style="display:none;">Change tournament</button>
         </div>
       </div>
 
@@ -714,6 +721,7 @@
       updateReportButton();
       if (queueConfig.slug) {
         document.getElementById("queueSetup").style.display = "none";
+        document.getElementById("changeTourneyBtn").style.display = "";
         await refreshQueue();
         startQueueTimer();
       }
@@ -741,11 +749,39 @@
         queueConfig.streamName = data.streamName;
         queueStations = data.stations || [];
         document.getElementById("queueSetup").style.display = "none";
+        document.getElementById("changeTourneyBtn").style.display = "";
         renderStations();
         startQueueTimer();
       } catch (e) {
         setQueueError("Network error: " + e.message);
       }
+    }
+
+    async function changeTournament() {
+      if (!confirm("Change tournament? This clears the loaded stream queue.")) return;
+      try {
+        const res = await fetch("/api/streamqueue/clear", { method: "POST" });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setQueueError(d.error || "Failed to clear tournament");
+          return;
+        }
+      } catch (e) {
+        setQueueError("Network error: " + e.message);
+        return;
+      }
+      if (queueTimer) { clearInterval(queueTimer); queueTimer = null; }
+      queueConfig.slug = null;
+      queueConfig.streamName = null;
+      queueStations = [];
+      activeSet = null;
+      updateReportButton();
+      document.getElementById("queueCards").innerHTML = "";
+      document.getElementById("queueControls").style.display = "none";
+      document.getElementById("changeTourneyBtn").style.display = "none";
+      document.getElementById("queueSetup").style.display = "flex";
+      document.getElementById("tourneyUrl").value = "";
+      setQueueError("");
     }
 
     async function refreshQueue() {
