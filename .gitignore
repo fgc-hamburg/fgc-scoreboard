@@ -4,3 +4,4 @@ __pycache__/
 .env
 .idea/
 sc/streamqueue.json
+sc/detectorconfig.json

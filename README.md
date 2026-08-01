@@ -48,7 +48,9 @@ A browser-based replacement for `StreamControl.exe` that works on macOS / Linux 
 make run-dashboard
 ```
 
-Then open **http://localhost:8080** in any browser. No dependencies required — pure Python stdlib.
+Then open **http://localhost:8080** in any browser. The dashboard itself needs no dependencies
+beyond the Python standard library. The optional match-detector integration (see below) needs
+`websockets`, installed via `make setup`.
 
 ### What it does
 
