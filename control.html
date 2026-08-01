@@ -272,10 +272,90 @@
     }
     .btn-report:hover:not(:disabled) { background: #7d47c4; }
     .btn-report:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Match Detector */
+    /* Header row + detector trigger pill */
+    .header-row {
+      width: 100%;
+      max-width: 820px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .header-row h1 { margin-bottom: 0; }
+    .detector-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #252525;
+      border: 1px solid #3a3a3a;
+      border-radius: 999px;
+      padding: 0.4rem 0.9rem;
+      font-size: 0.8rem;
+      color: #aaa;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .detector-pill:hover { border-color: #c40a18; }
+
+    /* Match Detector modal */
+    .detector-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #5a2020; flex-shrink: 0;
+    }
+    .detector-dot.connected { background: #5cb85c; }
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    .modal-backdrop.open { display: flex; }
+    .detector-modal {
+      background: #252525;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 1.25rem;
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .detector-header { display: flex; justify-content: space-between; align-items: center; }
+    .detector-header h2 {
+      font-size: 0.85rem; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #888;
+    }
+    .btn-modal-close {
+      background: transparent; color: #888; font-size: 1.1rem;
+      padding: 0.1rem 0.5rem; line-height: 1;
+    }
+    .btn-modal-close:hover { color: #ccc; }
+    .detector-status { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: #aaa; }
+    .detector-form { display: flex; gap: 0.75rem; align-items: flex-end; }
+    .detector-form label { flex: 1; }
+    .detector-form input[type="text"] { width: 100%; }
+    .detector-error { color: #d9534f; font-size: 0.82rem; }
+    .detector-error:empty { display: none; }
+    .detector-auto {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.82rem; color: #aaa;
+    }
   </style>
 </head>
 <body>
-  <h1>FGC Scoreboard Control</h1>
+  <div class="header-row">
+    <h1>FGC Scoreboard Control</h1>
+    <div class="detector-pill" id="detectorPill" onclick="openDetectorModal()">
+      <span class="detector-dot" id="detectorPillDot"></span>
+      <span id="detectorPillText">Detector: Disconnected</span>
+    </div>
+  </div>
 
   <div class="panel">
     <!-- Event info -->
@@ -293,6 +373,7 @@
         Game
         <select id="game">
           <option value="2XKO">2XKO</option>
+          <option value="AVATAR">AVATAR</option>
           <option value="BBCF">BBCF</option>
           <option value="BBTAG">BBTAG</option>
           <option value="COTW">COTW</option>
@@ -425,6 +506,43 @@
       <div class="queue-error" id="queueError"></div>
       <div class="queue-cards" id="queueCards"></div>
     </div>
+
+  </div>
+
+  <!-- Match Detector modal -->
+  <div class="modal-backdrop" id="detectorModalBackdrop" onclick="if (event.target === this) closeDetectorModal()">
+    <div class="detector-modal">
+      <div class="detector-header">
+        <h2>Match Detector</h2>
+        <button class="btn-modal-close" onclick="closeDetectorModal()">&times;</button>
+      </div>
+
+      <div class="detector-status">
+        <span class="detector-dot" id="detectorDot"></span>
+        <span id="detectorStatusText">Disconnected</span>
+      </div>
+
+      <div class="detector-form" id="detectorSetup">
+        <label>
+          Host
+          <input type="text" id="detectorHost" placeholder="localhost">
+        </label>
+        <label style="flex: 0 0 6rem;">
+          Port
+          <input type="text" id="detectorPort" placeholder="8765">
+        </label>
+        <button class="btn-load" id="detectorConnectBtn" onclick="connectDetector()">Connect</button>
+      </div>
+      <div class="detector-form" id="detectorConnected" style="display:none;">
+        <button class="btn-change" onclick="disconnectDetector()">Disconnect</button>
+        <label class="detector-auto">
+          <input type="checkbox" id="detectorAutoSubmit" onchange="toggleAutoSubmit()">
+          Auto-submit on receipt
+        </label>
+      </div>
+
+      <div class="detector-error" id="detectorError"></div>
+    </div>
   </div>
 
   <script>
@@ -448,6 +566,7 @@
       await loadData(true);
       setInterval(() => loadData(false), 2000);
       initQueue();
+      initDetector();
     }
 
     async function loadRounds() {
@@ -916,6 +1035,126 @@
       return String(s).replace(/[&<>"']/g, c => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
       }[c]));
+    }
+
+    // ---------- Match Detector ----------
+    const DETECTOR_GAME_MAP = { sf6: "SF6", tekken8: "TEKKEN8", avatar: "AVATAR" };
+    let detectorPollTimer = null;
+
+    async function initDetector() {
+      await refreshDetectorStatus();
+      if (detectorPollTimer) clearInterval(detectorPollTimer);
+      detectorPollTimer = setInterval(pollDetector, 2000);
+    }
+
+    async function pollDetector() {
+      await refreshDetectorStatus();
+      await pollDetectorEvents();
+    }
+
+    async function refreshDetectorStatus() {
+      try {
+        const res = await fetch("/api/detector/status");
+        const status = await res.json();
+        renderDetectorStatus(status);
+      } catch (_) {}
+    }
+
+    function renderDetectorStatus(status) {
+      const statusText = status.connected
+        ? `Connected to ${status.host}:${status.port}`
+        : (status.host ? `Connecting to ${status.host}:${status.port}...` : "Disconnected");
+
+      document.getElementById("detectorDot").classList.toggle("connected", !!status.connected);
+      document.getElementById("detectorStatusText").textContent = statusText;
+      document.getElementById("detectorPillDot").classList.toggle("connected", !!status.connected);
+      document.getElementById("detectorPillText").textContent = `Detector: ${statusText}`;
+
+      document.getElementById("detectorSetup").style.display = status.host ? "none" : "flex";
+      document.getElementById("detectorConnected").style.display = status.host ? "flex" : "none";
+      document.getElementById("detectorAutoSubmit").checked = !!status.autoSubmit;
+      document.getElementById("detectorError").textContent = status.error || "";
+    }
+
+    function openDetectorModal() {
+      document.getElementById("detectorModalBackdrop").classList.add("open");
+    }
+
+    function closeDetectorModal() {
+      document.getElementById("detectorModalBackdrop").classList.remove("open");
+    }
+
+    async function connectDetector() {
+      const host = document.getElementById("detectorHost").value.trim();
+      const port = document.getElementById("detectorPort").value.trim();
+      if (!host || !port) return;
+      try {
+        const res = await fetch("/api/detector/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ host, port: Number(port) }),
+        });
+        const status = await res.json();
+        if (!res.ok) { showStatus("Detector connect failed: " + (status.error || res.status), "err"); return; }
+        renderDetectorStatus(status);
+      } catch (e) {
+        showStatus("Detector connect failed: " + e.message, "err");
+      }
+    }
+
+    async function disconnectDetector() {
+      try {
+        const res = await fetch("/api/detector/disconnect", { method: "POST" });
+        const status = await res.json();
+        renderDetectorStatus(status);
+      } catch (e) {
+        showStatus("Detector disconnect failed: " + e.message, "err");
+      }
+    }
+
+    async function toggleAutoSubmit() {
+      const enabled = document.getElementById("detectorAutoSubmit").checked;
+      try {
+        const res = await fetch("/api/detector/auto_submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled }),
+        });
+        const status = await res.json();
+        renderDetectorStatus(status);
+      } catch (e) {
+        showStatus("Auto-submit toggle failed: " + e.message, "err");
+      }
+    }
+
+    async function pollDetectorEvents() {
+      let data;
+      try {
+        const res = await fetch("/api/detector/events");
+        data = await res.json();
+      } catch (_) { return; }
+      const events = data.events || [];
+      for (const event of events) {
+        await applyDetectorEvent(event);
+      }
+    }
+
+    async function applyDetectorEvent(event) {
+      const mappedGame = DETECTOR_GAME_MAP[event.game];
+      if (!mappedGame || mappedGame !== state.game) {
+        showStatus(
+          `Ignored ${event.winner} win — event was for ${event.game}, loaded game is ${state.game}`,
+          "err"
+        );
+        return;
+      }
+      const player = event.winner === "p1" ? 1 : event.winner === "p2" ? 2 : null;
+      if (!player) return;
+      adjustScore(player, 1);
+      const autoSubmit = document.getElementById("detectorAutoSubmit").checked;
+      if (autoSubmit) {
+        await submitData();
+      }
     }
 
     init();

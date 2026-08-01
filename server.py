@@ -21,6 +21,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
+import detector_client
 import startgg
 
 BASE_DIR = Path(__file__).parent
@@ -53,6 +54,11 @@ PORT = int(os.environ.get("PORT", 8080))
 QUEUE_CONFIG_PATH = BASE_DIR / "sc" / "streamqueue.json"
 STARTGG_TOKEN = os.environ.get("STARTGG_TOKEN", "").strip()
 STREAM_QUEUE_REFRESH_SECONDS = int(os.environ.get("STREAM_QUEUE_REFRESH_SECONDS", "30"))
+
+DETECTOR_CONFIG_PATH = BASE_DIR / "sc" / "detectorconfig.json"
+
+detector = detector_client.DetectorClient()
+DETECTOR_STATE = {"autoSubmit": False}
 
 EVENT_CSV_HEADER = [
     "timestamp", "event_type", "event_name", "game", "round",
@@ -89,6 +95,10 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_streamqueue_config()
         elif self.path == "/api/streamqueue":
             self._handle_get_streamqueue()
+        elif self.path == "/api/detector/status":
+            self._handle_get_detector_status()
+        elif self.path == "/api/detector/events":
+            self._handle_get_detector_events()
         else:
             self.send_json(404, {"error": "Not found"})
 
@@ -105,6 +115,12 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_post_report()
         elif self.path == "/api/streamqueue/clear":
             self._handle_post_clear()
+        elif self.path == "/api/detector/connect":
+            self._handle_post_detector_connect()
+        elif self.path == "/api/detector/disconnect":
+            self._handle_post_detector_disconnect()
+        elif self.path == "/api/detector/auto_submit":
+            self._handle_post_detector_auto_submit()
         else:
             self.send_json(404, {"error": "Not found"})
 
@@ -276,8 +292,68 @@ class Handler(BaseHTTPRequestHandler):
         startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": None, "streamName": None})
         self.send_json(200, {"ok": True})
 
+    # ---------- Match detector ----------
+
+    def _detector_status_payload(self):
+        status = detector.status()
+        status["autoSubmit"] = DETECTOR_STATE["autoSubmit"]
+        return status
+
+    def _handle_get_detector_status(self):
+        self.send_json(200, self._detector_status_payload())
+
+    def _handle_get_detector_events(self):
+        self.send_json(200, {"events": detector.drain_events()})
+
+    def _handle_post_detector_connect(self):
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        host = (body.get("host") or "").strip()
+        if not host:
+            self.send_json(400, {"error": "host is required"})
+            return
+        try:
+            port = int(body.get("port"))
+        except (TypeError, ValueError):
+            self.send_json(400, {"error": "port must be an integer"})
+            return
+        detector.connect(host, port)
+        detector_client.save_detector_config(DETECTOR_CONFIG_PATH, {
+            "host": host, "port": port, "autoSubmit": DETECTOR_STATE["autoSubmit"],
+        })
+        self.send_json(200, self._detector_status_payload())
+
+    def _handle_post_detector_disconnect(self):
+        detector.disconnect()
+        detector_client.save_detector_config(DETECTOR_CONFIG_PATH, {
+            "host": None, "port": None, "autoSubmit": DETECTOR_STATE["autoSubmit"],
+        })
+        self.send_json(200, self._detector_status_payload())
+
+    def _handle_post_detector_auto_submit(self):
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        DETECTOR_STATE["autoSubmit"] = bool(body.get("enabled"))
+        current = detector.status()
+        detector_client.save_detector_config(DETECTOR_CONFIG_PATH, {
+            "host": current["host"], "port": current["port"],
+            "autoSubmit": DETECTOR_STATE["autoSubmit"],
+        })
+        self.send_json(200, self._detector_status_payload())
+
 
 if __name__ == "__main__":
+    _detector_cfg = detector_client.load_detector_config(DETECTOR_CONFIG_PATH)
+    DETECTOR_STATE["autoSubmit"] = _detector_cfg["autoSubmit"]
+    if _detector_cfg["host"] and _detector_cfg["port"]:
+        detector.connect(_detector_cfg["host"], _detector_cfg["port"])
+
     server = HTTPServer(("", PORT), Handler)
     print(f"Control dashboard running at http://localhost:{PORT}")
     print(f"  JSON file: {JSON_PATH}")
