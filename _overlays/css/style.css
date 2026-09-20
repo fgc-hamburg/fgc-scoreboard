@@ -66,10 +66,9 @@ body {
     opacity: 0; }
   body .logos {
     width: 240px;
-    height: 140px;
     position: absolute;
     left: 840px;
-    top: 910px;
+    top: 950px;
     opacity: .7;
     display: none; }
   body #gameHold {
