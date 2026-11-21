@@ -16,12 +16,14 @@ import csv
 import json
 import os
 import re
+import threading
 import time
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import detector_client
+import overlays
 import startgg
 
 BASE_DIR = Path(__file__).parent
@@ -55,6 +57,12 @@ QUEUE_CONFIG_PATH = BASE_DIR / "sc" / "streamqueue.json"
 STARTGG_TOKEN = os.environ.get("STARTGG_TOKEN", "").strip()
 STREAM_QUEUE_REFRESH_SECONDS = int(os.environ.get("STREAM_QUEUE_REFRESH_SECONDS", "30"))
 
+SC_DIR = BASE_DIR / "sc"
+OVERLAY_STATE_PATH = BASE_DIR / "sc" / "overlaystate.json"
+OVERLAY_WAKE = threading.Event()
+OVERLAY_STATUS = {"lastRefresh": None, "lastError": None}
+_overlay_ctx_cache = {}
+
 DETECTOR_CONFIG_PATH = BASE_DIR / "sc" / "detectorconfig.json"
 
 detector = detector_client.DetectorClient()
@@ -70,6 +78,20 @@ def slugify(s):
     s = (s or "").lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
     return s or "untitled"
+
+
+def overlay_loop():
+    while True:
+        try:
+            state = overlays.load_state(OVERLAY_STATE_PATH)
+            overlays.refresh(state, STARTGG_TOKEN, SC_DIR, int(time.time()), _overlay_ctx_cache)
+            OVERLAY_STATUS["lastRefresh"] = int(time.time())
+            OVERLAY_STATUS["lastError"] = None
+        except Exception as e:  # the thread must never die
+            OVERLAY_STATUS["lastError"] = str(e)
+            print(f"overlay refresh failed: {e}")
+        OVERLAY_WAKE.wait(STREAM_QUEUE_REFRESH_SECONDS)
+        OVERLAY_WAKE.clear()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -95,6 +117,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_streamqueue_config()
         elif self.path == "/api/streamqueue":
             self._handle_get_streamqueue()
+        elif self.path == "/api/overlays/status":
+            self.send_json(200, dict(OVERLAY_STATUS))
         elif self.path == "/api/detector/status":
             self._handle_get_detector_status()
         elif self.path == "/api/detector/events":
@@ -115,6 +139,8 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_post_report()
         elif self.path == "/api/streamqueue/clear":
             self._handle_post_clear()
+        elif self.path == "/api/overlays/active":
+            self._handle_post_overlays_active()
         elif self.path == "/api/detector/connect":
             self._handle_post_detector_connect()
         elif self.path == "/api/detector/disconnect":
@@ -282,6 +308,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             startgg.submit_report(variables, STARTGG_TOKEN)
+            OVERLAY_WAKE.set()
             self.send_json(200, {"ok": True})
         except startgg.StreamQueueError as e:
             self.send_json(502, {"error": str(e)})
@@ -290,7 +317,22 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_token():
             return
         startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": None, "streamName": None})
+        overlays.save_state(OVERLAY_STATE_PATH, dict(overlays.DEFAULT_STATE))
         self.send_json(200, {"ok": True})
+
+    def _handle_post_overlays_active(self):
+        if not self._require_token():
+            return
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        prev = overlays.load_state(OVERLAY_STATE_PATH)
+        state = overlays.merge_active_state(prev, body)
+        overlays.save_state(OVERLAY_STATE_PATH, state)
+        OVERLAY_WAKE.set()
+        self.send_json(200, {"ok": True, "state": state})
 
     # ---------- Match detector ----------
 
@@ -354,7 +396,10 @@ if __name__ == "__main__":
     if _detector_cfg["host"] and _detector_cfg["port"]:
         detector.connect(_detector_cfg["host"], _detector_cfg["port"])
 
-    server = HTTPServer(("", PORT), Handler)
+    if STARTGG_TOKEN:
+        threading.Thread(target=overlay_loop, daemon=True).start()
+
+    server = ThreadingHTTPServer(("", PORT), Handler)
     print(f"Control dashboard running at http://localhost:{PORT}")
     print(f"  JSON file: {JSON_PATH}")
     try:
