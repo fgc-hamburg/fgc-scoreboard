@@ -1,0 +1,65 @@
+{
+  "updatedAt": 1784585220,
+  "eventName": "Street Fighter 6",
+  "player": {
+    "name": "MrCosta",
+    "team": "FGC HH"
+  },
+  "currentRound": "Losers Final",
+  "sets": [
+    {
+      "round": "Winners Round 1",
+      "opponent": {
+        "name": "Nova",
+        "team": ""
+      },
+      "score": "2-0",
+      "won": true
+    },
+    {
+      "round": "Winners Round 2",
+      "opponent": {
+        "name": "Tiger",
+        "team": "SKY"
+      },
+      "score": "2-1",
+      "won": true
+    },
+    {
+      "round": "Winners Quarter-Final",
+      "opponent": {
+        "name": "Kuroneko",
+        "team": "HAM"
+      },
+      "score": "1-2",
+      "won": false
+    },
+    {
+      "round": "Losers Round 2",
+      "opponent": {
+        "name": "Pixel",
+        "team": ""
+      },
+      "score": "DQ",
+      "won": true
+    },
+    {
+      "round": "Losers Quarter-Final",
+      "opponent": {
+        "name": "Bartholomew-Alexander the Third Extra Long",
+        "team": "Long Team Name"
+      },
+      "score": "2-0",
+      "won": true
+    },
+    {
+      "round": "Losers Semi-Final",
+      "opponent": {
+        "name": "Zed",
+        "team": "KIEL"
+      },
+      "score": "2-1",
+      "won": true
+    }
+  ]
+}
