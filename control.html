@@ -236,6 +236,9 @@
       letter-spacing: 0.08em; color: #888;
     }
     .queue-header-actions { display: flex; gap: 0.6rem; align-items: center; }
+    .path-toggle { display: flex; gap: 0.3rem; align-items: center; font-size: 0.8rem; color: #888; }
+    .path-toggle button { background: #3a3a3a; color: #ccc; font-size: 0.8rem; padding: 0.35rem 0.7rem; }
+    .path-toggle button.active { background: #c40a18; color: #fff; }
     .queue-controls { display: flex; gap: 0.6rem; align-items: center; }
     .btn-change { background: #5a2020; color: #e0b3b3; font-size: 0.8rem; }
     .btn-change:hover { background: #7a2828; }
@@ -485,6 +488,10 @@
       <div class="queue-header">
         <h2>Stream Queue</h2>
         <div class="queue-header-actions">
+          <div class="path-toggle">Player path:
+            <button id="pathP1" onclick="setPathSide('p1')">P1</button>
+            <button id="pathP2" onclick="setPathSide('p2')">P2</button>
+          </div>
           <div class="queue-controls" id="queueControls" style="display:none;">
             <select id="queueStation"></select>
             <button class="btn-refresh" onclick="refreshQueue()">&#8635; Refresh</button>
@@ -551,8 +558,18 @@
       eventName: "", eventDate: "",
       p1Name: "", p1Team: "", p1Name2: "", p1Team2: "", p1Score: 0,
       p2Name: "", p2Team: "", p2Name2: "", p2Team2: "", p2Score: 0,
-      round: "", game: "GGXRD"
+      round: "", game: "GGXRD", pathSide: "p1"
     };
+
+    function renderPathToggle() {
+      document.getElementById("pathP1").classList.toggle("active", state.pathSide === "p1");
+      document.getElementById("pathP2").classList.toggle("active", state.pathSide === "p2");
+    }
+    function setPathSide(side) {
+      state.pathSide = side;
+      renderPathToggle();
+      setDirty(true);
+    }
 
     // Last data loaded from server — used to detect external changes
     let serverSnapshot = null;
@@ -562,6 +579,7 @@
     // ---------- Init ----------
 
     async function init() {
+      renderPathToggle();
       await loadRounds();
       await loadData(true);
       setInterval(() => loadData(false), 2000);
@@ -772,6 +790,23 @@
           serverSnapshot = JSON.stringify({ ...payload, timestamp: "" }); // approximate
           setDirty(false);
           showStatus("Submitted.", "ok");
+          if (queueConfig.enabled) {
+            try {
+              const or = await fetch("/api/overlays/active", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  setId: activeSet?.setId ?? null,
+                  p1Id: activeSet?.p1Id ?? null,
+                  p2Id: activeSet?.p2Id ?? null,
+                  pathSide: state.pathSide,
+                }),
+              });
+              if (!or.ok) setQueueError("Overlay sync failed (" + or.status + ")");
+            } catch (e) {
+              setQueueError("Overlay sync failed: " + e.message);
+            }
+          }
           document.getElementById("p1Name").focus();
         } else {
           const err = await res.json();
