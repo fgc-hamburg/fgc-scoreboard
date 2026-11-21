@@ -1,0 +1,199 @@
+{
+  "updatedAt": 1784585220,
+  "tournamentName": "Bareknuckle Altona 2026",
+  "eventName": "Street Fighter 6",
+  "rounds": {
+    "winnersSemis": [
+      {
+        "setId": 101,
+        "state": 3,
+        "p1": {
+          "name": "MrCosta",
+          "team": "FGC HH",
+          "score": 2,
+          "winner": true
+        },
+        "p2": {
+          "name": "Kuroneko",
+          "team": "HAM",
+          "score": 0,
+          "winner": false
+        }
+      },
+      {
+        "setId": 102,
+        "state": 3,
+        "p1": {
+          "name": "Tiger",
+          "team": "SKY",
+          "score": 1,
+          "winner": false
+        },
+        "p2": {
+          "name": "Bartholomew-Alexander the Third",
+          "team": "Long Team Name",
+          "score": 2,
+          "winner": true
+        }
+      }
+    ],
+    "winnersFinal": [
+      {
+        "setId": 103,
+        "state": 3,
+        "p1": {
+          "name": "MrCosta",
+          "team": "FGC HH",
+          "score": 2,
+          "winner": true
+        },
+        "p2": {
+          "name": "Bartholomew-Alexander the Third",
+          "team": "Long Team Name",
+          "score": 1,
+          "winner": false
+        }
+      }
+    ],
+    "grandFinal": [
+      {
+        "setId": 110,
+        "state": 2,
+        "p1": {
+          "name": "MrCosta",
+          "team": "FGC HH",
+          "score": null,
+          "winner": false
+        },
+        "p2": {
+          "name": "Zed",
+          "team": "KIEL",
+          "score": null,
+          "winner": false
+        }
+      }
+    ],
+    "grandFinalReset": [
+      {
+        "setId": 111,
+        "state": 1,
+        "p1": {
+          "name": "MrCosta",
+          "team": "FGC HH",
+          "score": null,
+          "winner": false
+        },
+        "p2": {
+          "name": "Zed",
+          "team": "KIEL",
+          "score": null,
+          "winner": false
+        }
+      }
+    ],
+    "losersTop8": [
+      {
+        "setId": 104,
+        "state": 3,
+        "p1": {
+          "name": "Kuroneko",
+          "team": "HAM",
+          "score": 2,
+          "winner": true
+        },
+        "p2": {
+          "name": "Nova",
+          "team": "",
+          "score": 0,
+          "winner": false
+        }
+      },
+      {
+        "setId": 105,
+        "state": 3,
+        "p1": {
+          "name": "Tiger",
+          "team": "SKY",
+          "score": "DQ",
+          "winner": false
+        },
+        "p2": {
+          "name": "Zed",
+          "team": "KIEL",
+          "score": 0,
+          "winner": true
+        }
+      }
+    ],
+    "losersQuarters": [
+      {
+        "setId": 106,
+        "state": 3,
+        "p1": {
+          "name": "Kuroneko",
+          "team": "HAM",
+          "score": 1,
+          "winner": false
+        },
+        "p2": {
+          "name": "Ryu_Main_99",
+          "team": "BRM",
+          "score": 2,
+          "winner": true
+        }
+      },
+      {
+        "setId": 107,
+        "state": 2,
+        "p1": {
+          "name": "Zed",
+          "team": "KIEL",
+          "score": 1,
+          "winner": false
+        },
+        "p2": {
+          "name": "Pixel",
+          "team": "",
+          "score": 0,
+          "winner": false
+        }
+      }
+    ],
+    "losersSemis": [
+      {
+        "setId": 108,
+        "state": 1,
+        "p1": {
+          "name": "Ryu_Main_99",
+          "team": "BRM",
+          "score": null,
+          "winner": false
+        },
+        "p2": {
+          "name": null,
+          "team": "",
+          "score": null,
+          "winner": false
+        }
+      }
+    ],
+    "losersFinal": [
+      {
+        "setId": 109,
+        "state": null,
+        "p1": {
+          "name": null,
+          "team": "",
+          "score": null,
+          "winner": false
+        },
+        "p2": {
+          "name": null,
+          "team": "",
+          "score": null,
+          "winner": false
+        }
+      }
+    ]
+  }
+}
