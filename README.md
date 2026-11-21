@@ -106,17 +106,17 @@ size set to 1920x1080:
 - `_overlays/top8.html` — the top 8 bracket
 - `_overlays/playerpath.html` — the path table of one player
 
-They need `STARTGG_TOKEN` and a match loaded from the stream queue and
-submitted with **Submit**. The submitted match tells the server which event to
-read. The **P1/P2** toggle in the dashboard chooses whose path
+They need `STARTGG_TOKEN`. The top 8 appears as soon as a tournament is
+connected in the stream queue; for a tournament with several events, pick one
+with the **Top 8 event** dropdown in the dashboard. The player path still
+needs a match loaded from the queue and submitted with **Submit**. The **P1/P2** toggle in the dashboard chooses whose path
 `playerpath.html` shows. Both overlays show an empty frame (header only) until
 data is available, and keep the last good data if start.gg is unreachable.
 
 The server refreshes the data from start.gg every `STREAM_QUEUE_REFRESH_SECONDS`
 (default `30`) and on every Submit. The overlays re-read their JSON files
 (`sc/top8.json`, `sc/playerpath.json`) twice a second, so new results show up
-within one refresh interval. Changing the tournament keeps showing the previous
-tournament's overlays until a match from the new queue is loaded and submitted.
+within one refresh interval. Changing the tournament switches the top 8 on the next refresh.
 
 ---
 

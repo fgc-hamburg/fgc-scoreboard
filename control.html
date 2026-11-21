@@ -240,6 +240,7 @@
     .path-toggle button { background: #3a3a3a; color: #ccc; font-size: 0.8rem; padding: 0.35rem 0.7rem; }
     .path-toggle button.active { background: #c40a18; color: #fff; }
     .queue-controls { display: flex; gap: 0.6rem; align-items: center; }
+    .queue-controls label { white-space: nowrap; font-size: 0.8rem; color: #aaa; }
     .btn-change { background: #5a2020; color: #e0b3b3; font-size: 0.8rem; }
     .btn-change:hover { background: #7a2828; }
     .queue-setup { display: flex; gap: 0.75rem; align-items: flex-end; }
@@ -491,6 +492,10 @@
           <div class="path-toggle">Player path:
             <button id="pathP1" onclick="setPathSide('p1')">P1</button>
             <button id="pathP2" onclick="setPathSide('p2')">P2</button>
+          </div>
+          <div class="queue-controls" id="overlayEventWrap" style="display:none;">
+            <label for="overlayEvent">Top 8 event</label>
+            <select id="overlayEvent"></select>
           </div>
           <div class="queue-controls" id="queueControls" style="display:none;">
             <select id="queueStation"></select>
@@ -888,8 +893,57 @@
         document.getElementById("changeTourneyBtn").style.display = "";
         await refreshQueue();
         startQueueTimer();
+        loadOverlayEvents();
       }
     }
+
+    // Top 8 event picker: only shown for multi-event tournaments.
+    async function loadOverlayEvents() {
+      const wrap = document.getElementById("overlayEventWrap");
+      const sel = document.getElementById("overlayEvent");
+      wrap.style.display = "none";
+      try {
+        const res = await fetch("/api/overlays/events");
+        if (res.status === 403) return;   // token disabled
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setQueueError(data.error || "Failed to load events"); return; }
+        const events = data.events || [];
+        if (events.length < 2) return;
+        sel.innerHTML = "";
+        if (data.eventId == null) {
+          const ph = document.createElement("option");
+          ph.value = ""; ph.textContent = "Choose event..."; ph.disabled = true; ph.selected = true;
+          sel.appendChild(ph);
+        }
+        events.forEach(ev => {
+          const opt = document.createElement("option");
+          opt.value = ev.id; opt.textContent = ev.name;
+          if (String(ev.id) === String(data.eventId)) opt.selected = true;
+          sel.appendChild(opt);
+        });
+        wrap.style.display = "flex";
+      } catch (e) {
+        setQueueError("Network error: " + e.message);
+      }
+    }
+
+    document.getElementById("overlayEvent").addEventListener("change", async (e) => {
+      const raw = e.target.value;
+      const eventId = /^\d+$/.test(raw) ? Number(raw) : raw;
+      try {
+        const res = await fetch("/api/overlays/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventId }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setQueueError(d.error || "Failed to save event");
+        }
+      } catch (err) {
+        setQueueError("Network error: " + err.message);
+      }
+    });
 
     function startQueueTimer() {
       if (queueTimer) clearInterval(queueTimer);
@@ -916,6 +970,7 @@
         document.getElementById("changeTourneyBtn").style.display = "";
         renderStations();
         startQueueTimer();
+        loadOverlayEvents();
       } catch (e) {
         setQueueError("Network error: " + e.message);
       }
@@ -942,6 +997,7 @@
       updateReportButton();
       document.getElementById("queueCards").innerHTML = "";
       document.getElementById("queueControls").style.display = "none";
+      document.getElementById("overlayEventWrap").style.display = "none";
       document.getElementById("changeTourneyBtn").style.display = "none";
       document.getElementById("queueSetup").style.display = "flex";
       document.getElementById("tourneyUrl").value = "";

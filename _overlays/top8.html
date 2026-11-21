@@ -34,9 +34,10 @@
       z-index: 10;
     }
     #logo { height: 108px; width: auto; flex-shrink: 0; }
-    #headerCenter { flex: 1; text-align: center; }
+    #headerCenter { flex: 1; min-width: 0; text-align: center; }
     #eventName {
       display: block;
+      white-space: nowrap;
       font-size: 40px;
       color: #fff;
       letter-spacing: 0.07em;
@@ -227,6 +228,18 @@
       svg.appendChild(line('M' + xm + ' ' + yMid + 'H' + x2));
     }
 
+    // Shrink the title font until it fits on one line next to the logo.
+    function fitTitle() {
+      var t = document.getElementById('eventName');
+      var box = document.getElementById('headerCenter');
+      var size = 40;
+      t.style.fontSize = size + 'px';
+      while (size > 16 && t.scrollWidth > box.clientWidth) {
+        size -= 1;
+        t.style.fontSize = size + 'px';
+      }
+    }
+
     function render(d) {
       var rounds = d.rounds || {};
       var bracket = document.getElementById('bracket');
@@ -236,8 +249,10 @@
         if (c !== svg) bracket.removeChild(c);
       });
 
-      document.getElementById('eventText').textContent = d.eventName || '';
-      document.getElementById('tournamentName').textContent = d.tournamentName || '';
+      // Title = tournament name + " TOP 8"; subtitle = event name.
+      document.getElementById('eventText').textContent = d.tournamentName || '';
+      document.getElementById('tournamentName').textContent = d.eventName || '';
+      fitTitle();
 
       var reset = rounds.grandFinalReset || [];
       var hasReset = reset.length > 0;
