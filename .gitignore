@@ -5,3 +5,4 @@ __pycache__/
 .idea/
 sc/streamqueue.json
 sc/detectorconfig.json
+/http-client.private.env.json

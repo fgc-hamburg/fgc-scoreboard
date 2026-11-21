@@ -1,0 +1,85 @@
+### Request to get GraphQL Schema
+//TIP Our server works with the following GraphQL schema
+GET https://api.start.gg/gql/alpha
+Authorization: Bearer {{token}}
+
+>> {{$historyFolder}}/startgg.graphqls
+
+
+### GET EVENTID
+//TIP We just write a GraphQL query in the request body
+GRAPHQL https://api.start.gg/gql/alpha
+Authorization: Bearer {{token}}
+
+query getEventId($slug: String) {
+    event(slug: $slug) {
+        id
+        name
+    }
+},
+{
+"slug": "tournament/genesis-9-1/event/ultimate-singles"
+}
+
+### Entrants
+GRAPHQL https://api.start.gg/gql/alpha
+Authorization: Bearer {{token}}
+
+query EventEntrants($eventId: ID!, $page: Int!, $perPage: Int!) {
+    event(id: $eventId) {
+        id
+        name
+        entrants(query: {
+            page: $page
+            perPage: $perPage
+        }) {
+            pageInfo {
+                total
+                totalPages
+            }
+            nodes {
+                id
+                participants {
+                    id
+                    gamerTag
+                }
+            }
+        }
+    }
+},
+{
+"eventId": 121970,
+"page": 1,
+"perPage": 2
+}
+
+
+### Tournament attendees (backs scripts/export_attendees.py)
+GRAPHQL https://api.start.gg/gql/alpha
+Authorization: Bearer {{token}}
+
+query Attendees($slug: String!, $page: Int!, $perPage: Int!) {
+    tournament(slug: $slug) {
+        id
+        name
+        numAttendees
+        participants(query: { page: $page, perPage: $perPage }) {
+            pageInfo { total totalPages }
+            nodes {
+                id
+                gamerTag
+                prefix
+                email
+                checkedIn
+                contactInfo { name nameFirst nameLast }
+                user { id name }
+                events { id name }
+            }
+        }
+    }
+},
+{
+"slug": "bareknuckle-altona-2026",
+"page": 1,
+"perPage": 50
+}
