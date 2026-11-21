@@ -159,7 +159,8 @@ def build_player_path(sets, entrant_id, active_set, event_name, now):
     }
 
 
-DEFAULT_STATE = {"setId": None, "p1Id": None, "p2Id": None, "pathSide": "p1"}
+DEFAULT_STATE = {"setId": None, "p1Id": None, "p2Id": None, "pathSide": "p1",
+                 "eventId": None}
 
 
 def load_state(path):
@@ -199,10 +200,57 @@ def merge_active_state(prev, body):
         out["pathSide"] = side
         return out
     return {"setId": body["setId"], "p1Id": body.get("p1Id"),
-            "p2Id": body.get("p2Id"), "pathSide": side}
+            "p2Id": body.get("p2Id"), "pathSide": side,
+            "eventId": prev.get("eventId")}
 
 
-def refresh(state, token, sc_dir, now, context_cache):
+def set_event(prev, event_id):
+    out = dict(prev)
+    out["eventId"] = event_id
+    return out
+
+
+def pick_bracket_phase_group(event):
+    de = [p for p in event.get("phases") or []
+          if p.get("bracketType") == "DOUBLE_ELIMINATION"]
+    if de:
+        last = max(de, key=lambda p: p.get("phaseOrder") or 0)
+        ids = last.get("phaseGroupIds") or []
+        if len(ids) == 1:
+            return ids[0]
+    raise startgg.StreamQueueError("No single double-elimination bracket in this event")
+
+
+def resolve_event(events, event_id):
+    if event_id is not None:
+        for ev in events:
+            if _same_id(ev.get("id"), event_id):
+                return ev
+        raise startgg.StreamQueueError("Selected event not found")
+    if len(events) == 1:
+        return events[0]
+    raise startgg.StreamQueueError("Choose an event for the top 8")
+
+
+def refresh_top8(slug, event_id, token, sc_dir, now, cache):
+    if not slug:
+        return False
+    key = (slug, str(event_id))
+    info = cache.get(key)
+    if info is None:
+        t = startgg.fetch_tournament_events(slug, token)
+        event = resolve_event(t.get("events") or [], event_id)
+        info = {"tournamentName": t.get("tournamentName"), "event": event,
+                "phaseGroupId": pick_bracket_phase_group(event)}
+        cache.clear()
+        cache[key] = info
+    sets = startgg.fetch_phase_group_sets(info["phaseGroupId"], token)
+    top8 = build_top8(sets, info["tournamentName"], info["event"]["name"], now)
+    write_json_atomic(Path(sc_dir) / "top8.json", top8)
+    return True
+
+
+def refresh_path(state, token, sc_dir, now, context_cache):
     set_id = state.get("setId")
     if not set_id:
         return False
@@ -212,16 +260,24 @@ def refresh(state, token, sc_dir, now, context_cache):
         context_cache.clear()
         context_cache[set_id] = ctx
     event = ctx.get("event") or {}
-    tournament_name = (event.get("tournament") or {}).get("name")
     event_name = event.get("name")
-    pg_id = (ctx.get("phaseGroup") or {}).get("id")
     entrant_id = state.get("p2Id" if state.get("pathSide") == "p2" else "p1Id")
-
-    group_sets = startgg.fetch_phase_group_sets(pg_id, token)
     entrant_sets = startgg.fetch_entrant_event_sets(event.get("id"), entrant_id, token)
-    top8 = build_top8(group_sets, tournament_name, event_name, now)
     path = build_player_path(entrant_sets, entrant_id, ctx, event_name, now)
-    sc_dir = Path(sc_dir)
-    write_json_atomic(sc_dir / "top8.json", top8)
-    write_json_atomic(sc_dir / "playerpath.json", path)
+    write_json_atomic(Path(sc_dir) / "playerpath.json", path)
     return True
+
+
+def refresh_all(state, slug, token, sc_dir, now, caches):
+    results = {}
+    jobs = (
+        ("top8", lambda: refresh_top8(slug, state.get("eventId"), token, sc_dir, now,
+                                      caches["top8"])),
+        ("path", lambda: refresh_path(state, token, sc_dir, now, caches["path"])),
+    )
+    for name, job in jobs:
+        try:
+            results[name] = job()
+        except Exception as e:  # one job's failure must not skip the other
+            results[name] = str(e) or e.__class__.__name__
+    return results

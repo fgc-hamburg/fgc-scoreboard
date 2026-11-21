@@ -245,6 +245,32 @@ ENTRANT_EVENT_SETS_QUERY = (
     "id fullRoundText state winnerId completedAt " + _SLOTS + " } } } }")
 
 
+TOURNAMENT_EVENTS_QUERY = (
+    "query TournamentEvents($slug: String!) { tournament(slug: $slug) { name "
+    "events { id name phases { id phaseOrder bracketType "
+    "phaseGroups(query: {perPage: 50}) { nodes { id } } } } } }")
+
+
+def fetch_tournament_events(slug, token):
+    """Fetch a tournament's name and its events/phases/phase group ids."""
+    t = _graphql(TOURNAMENT_EVENTS_QUERY, {"slug": slug}, token).get("tournament")
+    if not t:
+        raise StreamQueueError("Tournament not found")
+    events = []
+    for ev in t.get("events") or []:
+        phases = []
+        for ph in ev.get("phases") or []:
+            nodes = (ph.get("phaseGroups") or {}).get("nodes") or []
+            phases.append({
+                "id": ph.get("id"),
+                "phaseOrder": ph.get("phaseOrder"),
+                "bracketType": ph.get("bracketType"),
+                "phaseGroupIds": [n.get("id") for n in nodes],
+            })
+        events.append({"id": ev.get("id"), "name": ev.get("name"), "phases": phases})
+    return {"tournamentName": t.get("name"), "events": events}
+
+
 def fetch_set_context(set_id, token):
     """Fetch one set with its event, tournament and phase group."""
     node = _graphql(SET_CONTEXT_QUERY, {"setId": set_id}, token).get("set")

@@ -221,16 +221,17 @@ class StateAndRefreshTests(unittest.TestCase):
         self.assertEqual(out["pathSide"], "p2")
 
     def test_merge_active_state_replaces_and_sanitizes_side(self):
-        prev = {"setId": 5, "p1Id": 1, "p2Id": 2, "pathSide": "p2"}
+        prev = {"setId": 5, "p1Id": 1, "p2Id": 2, "pathSide": "p2", "eventId": None}
         out = overlays.merge_active_state(
             prev, {"setId": 9, "p1Id": 3, "p2Id": 4, "pathSide": "x"})
-        self.assertEqual(out, {"setId": 9, "p1Id": 3, "p2Id": 4, "pathSide": "p1"})
+        self.assertEqual(out, {"setId": 9, "p1Id": 3, "p2Id": 4, "pathSide": "p1",
+                               "eventId": None})
 
     def test_state_roundtrip_and_defaults(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "state.json"
             self.assertEqual(overlays.load_state(p), overlays.DEFAULT_STATE)
-            st = {"setId": 1, "p1Id": 2, "p2Id": 3, "pathSide": "p2"}
+            st = {"setId": 1, "p1Id": 2, "p2Id": 3, "pathSide": "p2", "eventId": 4}
             overlays.save_state(p, st)
             self.assertEqual(overlays.load_state(p), st)
 
@@ -243,47 +244,195 @@ class StateAndRefreshTests(unittest.TestCase):
     def _state(self, side="p1"):
         return {"setId": 9, "p1Id": 10, "p2Id": 20, "pathSide": side}
 
-    def test_refresh_writes_both_files(self):
+    def test_refresh_path_writes_only_playerpath(self):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch("startgg.fetch_set_context", return_value=self._ctx()), \
-                mock.patch("startgg.fetch_phase_group_sets", return_value=full_bracket()), \
+                mock.patch("startgg.fetch_phase_group_sets") as fp, \
                 mock.patch("startgg.fetch_entrant_event_sets", return_value=[]) as fe:
-            self.assertTrue(overlays.refresh(self._state("p2"), "tok", Path(d), 123, {}))
-            self.assertTrue((Path(d) / "top8.json").exists())
+            self.assertTrue(overlays.refresh_path(self._state("p2"), "tok", Path(d), 123, {}))
             self.assertTrue((Path(d) / "playerpath.json").exists())
-            top = json.loads((Path(d) / "top8.json").read_text())
-            self.assertEqual(top["eventName"], "SF6")
+            self.assertFalse((Path(d) / "top8.json").exists())
+            fp.assert_not_called()
             self.assertEqual(fe.call_args[0][1], 20)
 
-    def test_refresh_caches_context(self):
+    def test_refresh_path_caches_context(self):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch("startgg.fetch_set_context", return_value=self._ctx()) as fc, \
-                mock.patch("startgg.fetch_phase_group_sets", return_value=[]), \
                 mock.patch("startgg.fetch_entrant_event_sets", return_value=[]):
             cache = {}
-            overlays.refresh(self._state(), "tok", Path(d), 1, cache)
-            overlays.refresh(self._state(), "tok", Path(d), 2, cache)
+            overlays.refresh_path(self._state(), "tok", Path(d), 1, cache)
+            overlays.refresh_path(self._state(), "tok", Path(d), 2, cache)
             self.assertEqual(fc.call_count, 1)
 
-    def test_refresh_error_leaves_files_untouched(self):
+    def test_refresh_path_error_leaves_file_untouched(self):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch("startgg.fetch_set_context", return_value=self._ctx()), \
-                mock.patch("startgg.fetch_phase_group_sets", return_value=[]), \
                 mock.patch("startgg.fetch_entrant_event_sets",
                            side_effect=StreamQueueError("boom")):
-            for n in ("top8.json", "playerpath.json"):
-                (Path(d) / n).write_text('{"old": true}')
+            (Path(d) / "playerpath.json").write_text('{"old": true}')
             with self.assertRaises(StreamQueueError):
-                overlays.refresh(self._state(), "tok", Path(d), 1, {})
-            for n in ("top8.json", "playerpath.json"):
-                self.assertEqual(json.loads((Path(d) / n).read_text()), {"old": True})
+                overlays.refresh_path(self._state(), "tok", Path(d), 1, {})
+            self.assertEqual(json.loads((Path(d) / "playerpath.json").read_text()), {"old": True})
 
-    def test_refresh_noop_without_set(self):
+    def test_refresh_path_noop_without_set(self):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch("startgg.fetch_set_context") as fc:
-            self.assertFalse(overlays.refresh(dict(overlays.DEFAULT_STATE), "tok", Path(d), 1, {}))
+            self.assertFalse(overlays.refresh_path(dict(overlays.DEFAULT_STATE), "tok", Path(d), 1, {}))
             fc.assert_not_called()
             self.assertEqual(list(Path(d).iterdir()), [])
+
+
+def _event(id=7, name="Tekken 8", phases=None):
+    if phases is None:
+        phases = [{"id": 1, "phaseOrder": 1, "bracketType": "DOUBLE_ELIMINATION",
+                   "phaseGroupIds": [77]}]
+    return {"id": id, "name": name, "phases": phases}
+
+
+def _tournament(*events):
+    return {"tournamentName": "Cup", "events": list(events) or [_event()]}
+
+
+class BracketPickTests(unittest.TestCase):
+    def test_pick_bracket_phase_group_single(self):
+        self.assertEqual(overlays.pick_bracket_phase_group(_event()), 77)
+
+    def test_pick_bracket_phase_group_highest_de_phase(self):
+        ev = _event(phases=[
+            {"id": 1, "phaseOrder": 1, "bracketType": "DOUBLE_ELIMINATION", "phaseGroupIds": [11]},
+            {"id": 2, "phaseOrder": 3, "bracketType": "ROUND_ROBIN", "phaseGroupIds": [33]},
+            {"id": 3, "phaseOrder": 2, "bracketType": "DOUBLE_ELIMINATION", "phaseGroupIds": [22]},
+        ])
+        self.assertEqual(overlays.pick_bracket_phase_group(ev), 22)
+
+    def test_pick_bracket_phase_group_none_raises(self):
+        ev = _event(phases=[{"id": 1, "phaseOrder": 1, "bracketType": "SINGLE_ELIMINATION",
+                             "phaseGroupIds": [1]}])
+        with self.assertRaisesRegex(StreamQueueError, "No single double-elimination bracket"):
+            overlays.pick_bracket_phase_group(ev)
+
+    def test_pick_bracket_phase_group_pools_raises(self):
+        ev = _event(phases=[{"id": 1, "phaseOrder": 1, "bracketType": "DOUBLE_ELIMINATION",
+                             "phaseGroupIds": [1, 2]}])
+        with self.assertRaisesRegex(StreamQueueError, "No single double-elimination bracket"):
+            overlays.pick_bracket_phase_group(ev)
+
+    def test_resolve_event_single_auto(self):
+        ev = _event()
+        self.assertIs(overlays.resolve_event([ev], None), ev)
+
+    def test_resolve_event_by_id_string_vs_int(self):
+        a, b = _event(1, "A"), _event(2, "B")
+        self.assertIs(overlays.resolve_event([a, b], "2"), b)
+        self.assertIs(overlays.resolve_event([a, b], 1), a)
+
+    def test_resolve_event_errors(self):
+        a, b = _event(1), _event(2)
+        with self.assertRaisesRegex(StreamQueueError, "Choose an event for the top 8"):
+            overlays.resolve_event([a, b], None)
+        with self.assertRaisesRegex(StreamQueueError, "Selected event not found"):
+            overlays.resolve_event([a, b], 9)
+
+    def test_set_event_and_merge_preserves_event_id(self):
+        prev = dict(overlays.DEFAULT_STATE)
+        self.assertIsNone(prev["eventId"])
+        prev = overlays.set_event(prev, 5)
+        self.assertEqual(prev["eventId"], 5)
+        out = overlays.merge_active_state(prev, {"setId": 9, "p1Id": 1, "p2Id": 2})
+        self.assertEqual(out["eventId"], 5)
+        out = overlays.merge_active_state(prev, {"setId": None})
+        self.assertEqual(out["eventId"], 5)
+
+
+class Top8RefreshTests(unittest.TestCase):
+    def test_refresh_top8_writes_with_tournament_name(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events", return_value=_tournament()), \
+                mock.patch("startgg.fetch_phase_group_sets", return_value=full_bracket()) as fp:
+            self.assertTrue(overlays.refresh_top8("cup", None, "tok", Path(d), 5, {}))
+            top = json.loads((Path(d) / "top8.json").read_text())
+            self.assertEqual(top["tournamentName"], "Cup")
+            self.assertEqual(top["eventName"], "Tekken 8")
+            self.assertEqual(fp.call_args[0][0], 77)
+
+    def test_refresh_top8_noop_without_slug(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events") as fe, \
+                mock.patch("startgg.fetch_phase_group_sets") as fp:
+            self.assertFalse(overlays.refresh_top8(None, None, "tok", Path(d), 5, {}))
+            fe.assert_not_called()
+            fp.assert_not_called()
+            self.assertEqual(list(Path(d).iterdir()), [])
+
+    def test_refresh_top8_requires_event_choice_when_multiple(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events",
+                           return_value=_tournament(_event(1), _event(2))), \
+                mock.patch("startgg.fetch_phase_group_sets") as fp:
+            (Path(d) / "top8.json").write_text('{"old": true}')
+            with self.assertRaisesRegex(StreamQueueError, "Choose an event for the top 8"):
+                overlays.refresh_top8("cup", None, "tok", Path(d), 5, {})
+            fp.assert_not_called()
+            self.assertEqual(json.loads((Path(d) / "top8.json").read_text()), {"old": True})
+
+    def test_refresh_top8_cache_keyed_by_slug_and_event(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events", return_value=_tournament()) as fe, \
+                mock.patch("startgg.fetch_phase_group_sets", return_value=[]):
+            cache = {}
+            overlays.refresh_top8("a", None, "tok", Path(d), 1, cache)
+            overlays.refresh_top8("a", None, "tok", Path(d), 2, cache)
+            self.assertEqual(fe.call_count, 1)
+            overlays.refresh_top8("b", None, "tok", Path(d), 3, cache)
+            self.assertEqual(fe.call_count, 2)
+            overlays.refresh_top8("b", 7, "tok", Path(d), 4, cache)
+            self.assertEqual(fe.call_count, 3)
+
+    def test_refresh_top8_error_leaves_file_untouched(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events", return_value=_tournament()), \
+                mock.patch("startgg.fetch_phase_group_sets",
+                           side_effect=StreamQueueError("boom")):
+            (Path(d) / "top8.json").write_text('{"old": true}')
+            with self.assertRaises(StreamQueueError):
+                overlays.refresh_top8("cup", None, "tok", Path(d), 5, {})
+            self.assertEqual(json.loads((Path(d) / "top8.json").read_text()), {"old": True})
+
+
+class RefreshAllTests(unittest.TestCase):
+    STATE = {"setId": 9, "p1Id": 10, "p2Id": 20, "pathSide": "p1", "eventId": None}
+
+    def _ctx(self):
+        return StateAndRefreshTests._ctx(None)
+
+    def test_refresh_jobs_are_independent(self):
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events", return_value=_tournament()), \
+                mock.patch("startgg.fetch_phase_group_sets", return_value=full_bracket()), \
+                mock.patch("startgg.fetch_set_context", side_effect=StreamQueueError("path boom")):
+            res = overlays.refresh_all(self.STATE, "cup", "tok", Path(d), 5,
+                                       {"top8": {}, "path": {}})
+            self.assertIs(res["top8"], True)
+            self.assertIn("path boom", res["path"])
+            self.assertTrue((Path(d) / "top8.json").exists())
+            self.assertFalse((Path(d) / "playerpath.json").exists())
+        with tempfile.TemporaryDirectory() as d, \
+                mock.patch("startgg.fetch_tournament_events",
+                           side_effect=StreamQueueError("top boom")), \
+                mock.patch("startgg.fetch_set_context", return_value=self._ctx()), \
+                mock.patch("startgg.fetch_entrant_event_sets", return_value=[]):
+            res = overlays.refresh_all(self.STATE, "cup", "tok", Path(d), 5,
+                                       {"top8": {}, "path": {}})
+            self.assertIn("top boom", res["top8"])
+            self.assertIs(res["path"], True)
+            self.assertFalse((Path(d) / "top8.json").exists())
+            self.assertTrue((Path(d) / "playerpath.json").exists())
+
+    def test_refresh_all_idle(self):
+        with tempfile.TemporaryDirectory() as d:
+            res = overlays.refresh_all(dict(overlays.DEFAULT_STATE), None, "tok", Path(d), 5,
+                                       {"top8": {}, "path": {}})
+            self.assertEqual(res, {"top8": False, "path": False})
 
 
 class NullRoundTests(unittest.TestCase):
