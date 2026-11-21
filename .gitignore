@@ -6,3 +6,6 @@ __pycache__/
 sc/streamqueue.json
 sc/detectorconfig.json
 /http-client.private.env.json
+sc/overlaystate.json
+sc/top8.json
+sc/playerpath.json

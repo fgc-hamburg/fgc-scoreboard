@@ -1,4 +1,10 @@
 """Pure builders for the top 8 / player path overlay JSON."""
+import json
+import os
+import tempfile
+from pathlib import Path
+
+import startgg
 from startgg import _slot
 
 ROUND_KEYS = [
@@ -71,8 +77,8 @@ def _sorted_matches(sets, round_no, positive):
 def build_top8(sets, tournament_name, event_name, now):
     resets = [s for s in sets if s.get("fullRoundText") == _RESET_TEXT]
     regular = [s for s in sets if s.get("fullRoundText") != _RESET_TEXT]
-    pos = [s["round"] for s in regular if s.get("round", 0) > 0]
-    neg = [s["round"] for s in regular if s.get("round", 0) < 0]
+    pos = [s["round"] for s in regular if (s.get("round") or 0) > 0]
+    neg = [s["round"] for s in regular if (s.get("round") or 0) < 0]
     w = max(pos) if pos else None
     l = min(neg) if neg else None
 
@@ -151,3 +157,70 @@ def build_player_path(sets, entrant_id, active_set, event_name, now):
         "currentRound": active_set.get("fullRoundText"),
         "sets": [r[1] for r in rows],
     }
+
+
+DEFAULT_STATE = {"setId": None, "p1Id": None, "p2Id": None, "pathSide": "p1"}
+
+
+def load_state(path):
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError):
+        return dict(DEFAULT_STATE)
+    if not isinstance(data, dict):
+        return dict(DEFAULT_STATE)
+    return {k: data.get(k, v) for k, v in DEFAULT_STATE.items()}
+
+
+def write_json_atomic(path, data):
+    path = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def save_state(path, state):
+    write_json_atomic(path, state)
+
+
+def merge_active_state(prev, body):
+    side = body.get("pathSide")
+    side = side if side in ("p1", "p2") else "p1"
+    if not body.get("setId"):
+        out = dict(prev)
+        out["pathSide"] = side
+        return out
+    return {"setId": body["setId"], "p1Id": body.get("p1Id"),
+            "p2Id": body.get("p2Id"), "pathSide": side}
+
+
+def refresh(state, token, sc_dir, now, context_cache):
+    set_id = state.get("setId")
+    if not set_id:
+        return
+    ctx = context_cache.get(set_id)
+    if ctx is None:
+        ctx = startgg.fetch_set_context(set_id, token)
+        context_cache.clear()
+        context_cache[set_id] = ctx
+    event = ctx.get("event") or {}
+    tournament_name = (event.get("tournament") or {}).get("name")
+    event_name = event.get("name")
+    pg_id = (ctx.get("phaseGroup") or {}).get("id")
+    entrant_id = state.get("p2Id" if state.get("pathSide") == "p2" else "p1Id")
+
+    group_sets = startgg.fetch_phase_group_sets(pg_id, token)
+    entrant_sets = startgg.fetch_entrant_event_sets(event.get("id"), entrant_id, token)
+    top8 = build_top8(group_sets, tournament_name, event_name, now)
+    path = build_player_path(entrant_sets, entrant_id, ctx, event_name, now)
+    sc_dir = Path(sc_dir)
+    write_json_atomic(sc_dir / "top8.json", top8)
+    write_json_atomic(sc_dir / "playerpath.json", path)
