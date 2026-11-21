@@ -84,8 +84,8 @@ def overlay_loop():
     while True:
         try:
             state = overlays.load_state(OVERLAY_STATE_PATH)
-            overlays.refresh(state, STARTGG_TOKEN, SC_DIR, int(time.time()), _overlay_ctx_cache)
-            OVERLAY_STATUS["lastRefresh"] = int(time.time())
+            if overlays.refresh(state, STARTGG_TOKEN, SC_DIR, int(time.time()), _overlay_ctx_cache):
+                OVERLAY_STATUS["lastRefresh"] = int(time.time())
             OVERLAY_STATUS["lastError"] = None
         except Exception as e:  # the thread must never die
             OVERLAY_STATUS["lastError"] = str(e)
@@ -119,6 +119,10 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_get_streamqueue()
         elif self.path == "/api/overlays/status":
             self.send_json(200, dict(OVERLAY_STATUS))
+        elif self.path == "/api/overlays/active":
+            if not self._require_token():
+                return
+            self.send_json(200, overlays.load_state(OVERLAY_STATE_PATH))
         elif self.path == "/api/detector/status":
             self._handle_get_detector_status()
         elif self.path == "/api/detector/events":

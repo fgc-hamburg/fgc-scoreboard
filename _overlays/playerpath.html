@@ -185,10 +185,12 @@
         if (xhr.readyState !== 4) return;
         // a missing file (404) or file:// failure (status 0, empty body) keeps the current DOM
         if (!xhr.responseText || (xhr.status !== 200 && xhr.status !== 0)) return;
-        if (xhr.responseText === lastText) return;
         try {
-          render(JSON.parse(xhr.responseText));
-          lastText = xhr.responseText;
+          var d = JSON.parse(xhr.responseText);
+          var key = JSON.stringify(Object.assign({}, d, { updatedAt: 0 }));
+          if (key === lastText) return;
+          render(d);
+          lastText = key;
         } catch (e) {}
       };
       xhr.send();

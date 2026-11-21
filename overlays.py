@@ -205,7 +205,7 @@ def merge_active_state(prev, body):
 def refresh(state, token, sc_dir, now, context_cache):
     set_id = state.get("setId")
     if not set_id:
-        return
+        return False
     ctx = context_cache.get(set_id)
     if ctx is None:
         ctx = startgg.fetch_set_context(set_id, token)
@@ -224,3 +224,4 @@ def refresh(state, token, sc_dir, now, context_cache):
     sc_dir = Path(sc_dir)
     write_json_atomic(sc_dir / "top8.json", top8)
     write_json_atomic(sc_dir / "playerpath.json", path)
+    return True

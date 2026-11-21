@@ -873,6 +873,16 @@
 
       document.getElementById("queueSection").style.display = "flex";
       updateReportButton();
+      try {
+        const ar = await fetch("/api/overlays/active");
+        if (ar.ok) {
+          const as = await ar.json();
+          if (as.pathSide === "p1" || as.pathSide === "p2") {
+            state.pathSide = as.pathSide;
+            renderPathToggle();
+          }
+        }
+      } catch (_) {}
       if (queueConfig.slug) {
         document.getElementById("queueSetup").style.display = "none";
         document.getElementById("changeTourneyBtn").style.display = "";

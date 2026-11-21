@@ -115,7 +115,8 @@ data is available, and keep the last good data if start.gg is unreachable.
 The server refreshes the data from start.gg every `STREAM_QUEUE_REFRESH_SECONDS`
 (default `30`) and on every Submit. The overlays re-read their JSON files
 (`sc/top8.json`, `sc/playerpath.json`) twice a second, so new results show up
-within one refresh interval.
+within one refresh interval. Changing the tournament keeps showing the previous
+tournament's overlays until a match from the new queue is loaded and submitted.
 
 ---
 

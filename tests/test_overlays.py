@@ -114,6 +114,16 @@ class Top8Tests(unittest.TestCase):
         gf5 = [s["id"] for s in sets if s["round"] == 5]
         self.assertEqual([m["setId"] for m in out["rounds"]["grandFinal"]], gf5)
 
+    def test_top8_reset_same_round_as_gf(self):
+        sets = [s for s in full_bracket() if s["round"] != 5]
+        sets.append(mkset(900, 5, "Grand Final", "GF", (1, "a", "", 2), (2, "b", "", 0), winner=1))
+        sets.append(mkset(901, 5, "Grand Final Reset", "GR", (1, "a", "", 0), (2, "b", "", 0)))
+        out = build_top8(sets, "T", "E", 1)
+        self.assertEqual([m["setId"] for m in out["rounds"]["grandFinal"]], [900])
+        self.assertEqual([m["setId"] for m in out["rounds"]["grandFinalReset"]], [901])
+        wf = [s["id"] for s in sets if s["round"] == 4]
+        self.assertEqual([m["setId"] for m in out["rounds"]["winnersFinal"]], wf)
+
     def test_top8_unplayed_reset_hidden(self):
         sets = full_bracket()
         sets.append(mkset(999, 6, "Grand Final Reset", "ZZ", None, None, state=1))
@@ -238,7 +248,7 @@ class StateAndRefreshTests(unittest.TestCase):
                 mock.patch("startgg.fetch_set_context", return_value=self._ctx()), \
                 mock.patch("startgg.fetch_phase_group_sets", return_value=full_bracket()), \
                 mock.patch("startgg.fetch_entrant_event_sets", return_value=[]) as fe:
-            overlays.refresh(self._state("p2"), "tok", Path(d), 123, {})
+            self.assertTrue(overlays.refresh(self._state("p2"), "tok", Path(d), 123, {}))
             self.assertTrue((Path(d) / "top8.json").exists())
             self.assertTrue((Path(d) / "playerpath.json").exists())
             top = json.loads((Path(d) / "top8.json").read_text())
@@ -271,7 +281,7 @@ class StateAndRefreshTests(unittest.TestCase):
     def test_refresh_noop_without_set(self):
         with tempfile.TemporaryDirectory() as d, \
                 mock.patch("startgg.fetch_set_context") as fc:
-            overlays.refresh(dict(overlays.DEFAULT_STATE), "tok", Path(d), 1, {})
+            self.assertFalse(overlays.refresh(dict(overlays.DEFAULT_STATE), "tok", Path(d), 1, {}))
             fc.assert_not_called()
             self.assertEqual(list(Path(d).iterdir()), [])
 
