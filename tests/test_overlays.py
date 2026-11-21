@@ -5,7 +5,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import overlays
-from overlays import ROUND_KEYS, build_top8
+from overlays import ROUND_KEYS, build_top8, build_player_path
 
 
 def _slot(p):
@@ -140,6 +140,61 @@ class Top8Tests(unittest.TestCase):
         self.assertEqual(out["tournamentName"], "Tourney")
         self.assertEqual(out["eventName"], "Event")
         self.assertEqual(out["updatedAt"], 12345)
+
+
+class PlayerPathTests(unittest.TestCase):
+    ME = (7, "Me", "HH")
+
+    def _mine(self, score):
+        return (7, "Me", "HH", score)
+
+    def _active(self, my_slot=0):
+        mine, opp = self._mine(None), (9, "Next", "", None)
+        a, b = (mine, opp) if my_slot == 0 else (opp, mine)
+        return mkset(100, 5, "Winners Final", "Z", a, b, state=2)
+
+    def test_path_orders_chronologically_and_excludes_active(self):
+        sets = [
+            mkset(1, 1, "Winners Round 1", "A", self._mine(2), (11, "x", "", 0), winner=7, completed_at=300),
+            mkset(2, 2, "Winners Round 2", "B", self._mine(2), (12, "y", "", 0), winner=7, completed_at=100),
+            mkset(3, 3, "Winners Round 3", "C", self._mine(2), (13, "z", "", 0), winner=7, completed_at=200),
+            self._active(),
+        ]
+        out = build_player_path(sets, 7, self._active(), "E", 1)
+        self.assertEqual([s["round"] for s in out["sets"]],
+                         ["Winners Round 2", "Winners Round 3", "Winners Round 1"])
+        self.assertEqual(len(out["sets"]), 3)
+
+    def test_path_score_from_player_perspective(self):
+        s = mkset(1, 1, "R1", "A", (11, "Opp", "OT", 1), self._mine(2), winner=7, completed_at=1)
+        out = build_player_path([s], 7, self._active(), "E", 1)
+        self.assertEqual(out["sets"][0], {"round": "R1", "opponent": {"name": "Opp", "team": "OT"},
+                                          "score": "2-1", "won": True})
+
+    def test_path_includes_losses(self):
+        s = mkset(1, 1, "R1", "A", self._mine(0), (11, "Opp", "", 2), winner=11, completed_at=1)
+        out = build_player_path([s], 7, self._active(), "E", 1)
+        self.assertEqual(out["sets"][0]["score"], "0-2")
+        self.assertIs(out["sets"][0]["won"], False)
+
+    def test_path_skips_incomplete_and_byes(self):
+        inc = mkset(1, 1, "R1", "A", self._mine(None), (11, "o", "", None), state=2)
+        bye = mkset(2, 2, "R2", "B", self._mine(None), None, winner=7)
+        out = build_player_path([inc, bye], 7, self._active(), "E", 1)
+        self.assertEqual(out["sets"], [])
+
+    def test_path_dq(self):
+        s = mkset(1, 1, "R1", "A", self._mine(0), (11, "o", "", -1), winner=7, completed_at=1)
+        out = build_player_path([s], 7, self._active(), "E", 1)
+        self.assertEqual(out["sets"][0]["score"], "DQ")
+        self.assertIs(out["sets"][0]["won"], True)
+
+    def test_path_header(self):
+        out = build_player_path([], "7", self._active(1), "Event", 55)
+        self.assertEqual(out["player"], {"name": "Me", "team": "HH"})
+        self.assertEqual(out["currentRound"], "Winners Final")
+        self.assertEqual(out["eventName"], "Event")
+        self.assertEqual(out["updatedAt"], 55)
 
 
 if __name__ == "__main__":

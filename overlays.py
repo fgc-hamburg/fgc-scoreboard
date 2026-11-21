@@ -102,3 +102,52 @@ def build_top8(sets, tournament_name, event_name, now):
         "eventName": event_name,
         "rounds": rounds,
     }
+
+
+def _path_score(mine, theirs):
+    if mine == "DQ" or theirs == "DQ":
+        return "DQ"
+    if mine is None and theirs is None:
+        return ""
+    return f"{mine or 0}-{theirs or 0}"
+
+
+def build_player_path(sets, entrant_id, active_set, event_name, now):
+    active_slots = active_set.get("slots") or []
+    player = {"name": None, "team": ""}
+    for i in range(2):
+        eid, name, team = _slot(active_slots, i)
+        if _same_id(eid, entrant_id):
+            player = {"name": name, "team": team}
+            break
+
+    rows = []
+    for s in sets:
+        if s.get("state") != 3 or _same_id(s.get("id"), active_set.get("id")):
+            continue
+        slots = s.get("slots") or []
+        ids = [_slot(slots, 0)[0], _slot(slots, 1)[0]]
+        if ids[0] is None or ids[1] is None:
+            continue
+        if _same_id(ids[0], entrant_id):
+            mi = 0
+        elif _same_id(ids[1], entrant_id):
+            mi = 1
+        else:
+            continue
+        _, opp_name, opp_team = _slot(slots, 1 - mi)
+        score = _path_score(_score(slots[mi], True), _score(slots[1 - mi], True))
+        rows.append((s.get("completedAt"), {
+            "round": s.get("fullRoundText"),
+            "opponent": {"name": opp_name, "team": opp_team},
+            "score": score,
+            "won": _same_id(s.get("winnerId"), entrant_id),
+        }))
+    rows.sort(key=lambda r: (r[0] is None, r[0] or 0))
+    return {
+        "updatedAt": now,
+        "eventName": event_name,
+        "player": player,
+        "currentRound": active_set.get("fullRoundText"),
+        "sets": [r[1] for r in rows],
+    }
