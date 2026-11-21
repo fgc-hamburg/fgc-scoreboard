@@ -287,8 +287,10 @@ class Handler(BaseHTTPRequestHandler):
         if not slug:
             self.send_json(400, {"error": "Could not parse tournament URL"})
             return
-        startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": slug, "streamName": None})
+        # Reset the event choice before saving the new slug, so the refresh
+        # loop never pairs the new tournament with the old event id.
         self._reset_event_choice()
+        startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": slug, "streamName": None})
         try:
             stations = startgg.fetch_stream_queue(slug, STARTGG_TOKEN)
             self.send_json(200, {"slug": slug, "stations": stations, "streamName": None})
