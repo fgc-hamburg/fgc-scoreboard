@@ -296,5 +296,50 @@ class ReportSetTests(unittest.TestCase):
         g.assert_not_called()
 
 
+class OverlayFetcherTests(unittest.TestCase):
+    def test_fetch_phase_group_sets_paginates(self):
+        pages = [
+            {"phaseGroup": {"sets": {"pageInfo": {"totalPages": 2}, "nodes": [{"id": 1}, {"id": 2}]}}},
+            {"phaseGroup": {"sets": {"pageInfo": {"totalPages": 2}, "nodes": [{"id": 3}]}}},
+        ]
+        with mock.patch("startgg._graphql", side_effect=pages) as g:
+            out = startgg.fetch_phase_group_sets(99, "tok")
+        self.assertEqual([n["id"] for n in out], [1, 2, 3])
+        self.assertEqual(g.call_count, 2)
+        self.assertEqual(g.call_args_list[1][0][1]["page"], 2)
+
+    def test_fetch_entrant_event_sets_passes_filter(self):
+        data = {"event": {"sets": {"pageInfo": {"totalPages": 1}, "nodes": [{"id": 1}]}}}
+        with mock.patch("startgg._graphql", return_value=data) as g:
+            out = startgg.fetch_entrant_event_sets(7, 42, "tok")
+        variables = g.call_args[0][1]
+        self.assertEqual(variables["entrantId"], 42)
+        self.assertEqual(variables["eventId"], 7)
+        self.assertEqual(out, [{"id": 1}])
+
+    def test_fetch_tournament_events_shapes_phase_group_ids(self):
+        data = {"tournament": {"name": "Cup", "events": [{
+            "id": 7, "name": "Tekken 8",
+            "phases": [{"id": 1, "phaseOrder": 1, "bracketType": "DOUBLE_ELIMINATION",
+                        "phaseGroups": {"nodes": [{"id": 77}]}}]}]}}
+        with mock.patch("startgg._graphql", return_value=data) as g:
+            out = startgg.fetch_tournament_events("cup", "tok")
+        self.assertEqual(g.call_args[0][1], {"slug": "cup"})
+        self.assertEqual(out, {"tournamentName": "Cup", "events": [{
+            "id": 7, "name": "Tekken 8",
+            "phases": [{"id": 1, "phaseOrder": 1, "bracketType": "DOUBLE_ELIMINATION",
+                        "phaseGroupIds": [77]}]}]})
+
+    def test_fetch_tournament_events_not_found(self):
+        with mock.patch("startgg._graphql", return_value={"tournament": None}):
+            with self.assertRaisesRegex(StreamQueueError, "Tournament not found"):
+                startgg.fetch_tournament_events("nope", "tok")
+
+    def test_fetch_set_context_missing_raises(self):
+        with mock.patch("startgg._graphql", return_value={"set": None}):
+            with self.assertRaises(StreamQueueError):
+                startgg.fetch_set_context(5, "tok")
+
+
 if __name__ == "__main__":
     unittest.main()

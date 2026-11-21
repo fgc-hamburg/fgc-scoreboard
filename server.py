@@ -16,12 +16,14 @@ import csv
 import json
 import os
 import re
+import threading
 import time
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import detector_client
+import overlays
 import startgg
 
 BASE_DIR = Path(__file__).parent
@@ -55,6 +57,13 @@ QUEUE_CONFIG_PATH = BASE_DIR / "sc" / "streamqueue.json"
 STARTGG_TOKEN = os.environ.get("STARTGG_TOKEN", "").strip()
 STREAM_QUEUE_REFRESH_SECONDS = int(os.environ.get("STREAM_QUEUE_REFRESH_SECONDS", "30"))
 
+SC_DIR = BASE_DIR / "sc"
+OVERLAY_STATE_PATH = BASE_DIR / "sc" / "overlaystate.json"
+OVERLAY_WAKE = threading.Event()
+OVERLAY_STATUS = {"lastRefresh": None, "lastError": None,
+                  "top8Error": None, "pathError": None}
+_overlay_caches = {"top8": {}, "path": {}}
+
 DETECTOR_CONFIG_PATH = BASE_DIR / "sc" / "detectorconfig.json"
 
 detector = detector_client.DetectorClient()
@@ -70,6 +79,27 @@ def slugify(s):
     s = (s or "").lower().strip()
     s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
     return s or "untitled"
+
+
+def overlay_loop():
+    while True:
+        try:
+            state = overlays.load_state(OVERLAY_STATE_PATH)
+            slug = startgg.load_queue_config(QUEUE_CONFIG_PATH)["slug"]
+            res = overlays.refresh_all(state, slug, STARTGG_TOKEN, SC_DIR,
+                                       int(time.time()), _overlay_caches)
+            if res["top8"] is True or res["path"] is True:
+                OVERLAY_STATUS["lastRefresh"] = int(time.time())
+            errs = {k: (v if isinstance(v, str) else None) for k, v in res.items()}
+            OVERLAY_STATUS["top8Error"] = errs["top8"]
+            OVERLAY_STATUS["pathError"] = errs["path"]
+            joined = "; ".join(e for e in errs.values() if e)
+            OVERLAY_STATUS["lastError"] = joined or None
+        except Exception as e:  # the thread must never die
+            OVERLAY_STATUS["lastError"] = str(e)
+            print(f"overlay refresh failed: {e}")
+        OVERLAY_WAKE.wait(STREAM_QUEUE_REFRESH_SECONDS)
+        OVERLAY_WAKE.clear()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -95,6 +125,14 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_streamqueue_config()
         elif self.path == "/api/streamqueue":
             self._handle_get_streamqueue()
+        elif self.path == "/api/overlays/status":
+            self.send_json(200, dict(OVERLAY_STATUS))
+        elif self.path == "/api/overlays/active":
+            if not self._require_token():
+                return
+            self.send_json(200, overlays.load_state(OVERLAY_STATE_PATH))
+        elif self.path == "/api/overlays/events":
+            self._handle_get_overlay_events()
         elif self.path == "/api/detector/status":
             self._handle_get_detector_status()
         elif self.path == "/api/detector/events":
@@ -115,6 +153,10 @@ class Handler(BaseHTTPRequestHandler):
             self._handle_post_report()
         elif self.path == "/api/streamqueue/clear":
             self._handle_post_clear()
+        elif self.path == "/api/overlays/active":
+            self._handle_post_overlays_active()
+        elif self.path == "/api/overlays/event":
+            self._handle_post_overlays_event()
         elif self.path == "/api/detector/connect":
             self._handle_post_detector_connect()
         elif self.path == "/api/detector/disconnect":
@@ -245,6 +287,9 @@ class Handler(BaseHTTPRequestHandler):
         if not slug:
             self.send_json(400, {"error": "Could not parse tournament URL"})
             return
+        # Reset the event choice before saving the new slug, so the refresh
+        # loop never pairs the new tournament with the old event id.
+        self._reset_event_choice()
         startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": slug, "streamName": None})
         try:
             stations = startgg.fetch_stream_queue(slug, STARTGG_TOKEN)
@@ -282,6 +327,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             startgg.submit_report(variables, STARTGG_TOKEN)
+            OVERLAY_WAKE.set()
             self.send_json(200, {"ok": True})
         except startgg.StreamQueueError as e:
             self.send_json(502, {"error": str(e)})
@@ -290,7 +336,62 @@ class Handler(BaseHTTPRequestHandler):
         if not self._require_token():
             return
         startgg.save_queue_config(QUEUE_CONFIG_PATH, {"slug": None, "streamName": None})
+        overlays.save_state(OVERLAY_STATE_PATH, dict(overlays.DEFAULT_STATE))
+        _overlay_caches["top8"].clear()
+        OVERLAY_WAKE.set()
         self.send_json(200, {"ok": True})
+
+    def _reset_event_choice(self):
+        prev = overlays.load_state(OVERLAY_STATE_PATH)
+        overlays.save_state(OVERLAY_STATE_PATH, overlays.set_event(prev, None))
+        _overlay_caches["top8"].clear()
+        OVERLAY_WAKE.set()
+
+    def _handle_get_overlay_events(self):
+        if not self._require_token():
+            return
+        cfg = startgg.load_queue_config(QUEUE_CONFIG_PATH)
+        if not cfg.get("slug"):
+            self.send_json(409, {"error": "No tournament loaded"})
+            return
+        try:
+            t = startgg.fetch_tournament_events(cfg["slug"], STARTGG_TOKEN)
+        except startgg.StreamQueueError as e:
+            self.send_json(502, {"error": str(e)})
+            return
+        state = overlays.load_state(OVERLAY_STATE_PATH)
+        self.send_json(200, {
+            "events": [{"id": ev["id"], "name": ev["name"]} for ev in t["events"]],
+            "eventId": state.get("eventId"),
+        })
+
+    def _handle_post_overlays_event(self):
+        if not self._require_token():
+            return
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        prev = overlays.load_state(OVERLAY_STATE_PATH)
+        state = overlays.set_event(prev, body.get("eventId"))
+        overlays.save_state(OVERLAY_STATE_PATH, state)
+        OVERLAY_WAKE.set()
+        self.send_json(200, {"ok": True, "state": state})
+
+    def _handle_post_overlays_active(self):
+        if not self._require_token():
+            return
+        try:
+            body = self._read_json_body()
+        except ValueError:
+            self.send_json(400, {"error": "Invalid JSON"})
+            return
+        prev = overlays.load_state(OVERLAY_STATE_PATH)
+        state = overlays.merge_active_state(prev, body)
+        overlays.save_state(OVERLAY_STATE_PATH, state)
+        OVERLAY_WAKE.set()
+        self.send_json(200, {"ok": True, "state": state})
 
     # ---------- Match detector ----------
 
@@ -354,7 +455,10 @@ if __name__ == "__main__":
     if _detector_cfg["host"] and _detector_cfg["port"]:
         detector.connect(_detector_cfg["host"], _detector_cfg["port"])
 
-    server = HTTPServer(("", PORT), Handler)
+    if STARTGG_TOKEN:
+        threading.Thread(target=overlay_loop, daemon=True).start()
+
+    server = ThreadingHTTPServer(("", PORT), Handler)
     print(f"Control dashboard running at http://localhost:{PORT}")
     print(f"  JSON file: {JSON_PATH}")
     try:

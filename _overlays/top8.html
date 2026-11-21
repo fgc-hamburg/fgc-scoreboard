@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Top 8</title>
+  <style>
+    @font-face {
+      src: url('fonts/ValorantFont.ttf');
+      font-family: "Valorant";
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Valorant";
+      color: white;
+      text-transform: uppercase;
+      background:
+        radial-gradient(ellipse at 50% 38%, rgba(255, 140, 0, 0.08) 0%, transparent 58%),
+        radial-gradient(circle, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        #0d0d0d;
+      background-size: auto, 44px 44px, auto;
+    }
+
+    #header {
+      position: absolute; left: 0; top: 0;
+      width: 1920px; height: 130px;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex; align-items: center;
+      padding: 0 40px;
+      z-index: 10;
+    }
+    #logo { height: 108px; width: auto; flex-shrink: 0; }
+    #headerCenter { flex: 1; min-width: 0; text-align: center; }
+    #eventName {
+      display: block;
+      white-space: nowrap;
+      font-size: 40px;
+      color: #fff;
+      letter-spacing: 0.07em;
+      line-height: 1.1;
+      text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.9);
+    }
+    #top8Tag {
+      color: #e91e8c;
+      text-shadow: 0 0 24px rgba(233, 30, 140, 0.55), 2px 2px 0 rgba(0, 0, 0, 0.9);
+    }
+    #tournamentName {
+      display: block;
+      font-size: 20px;
+      color: #00e5ff;
+      text-shadow: 0 0 16px rgba(0, 229, 255, 0.5), 1px 1px 0 rgba(0, 0, 0, 0.9);
+      margin-top: 8px;
+      letter-spacing: 0.14em;
+    }
+    #headerSpacer { flex-shrink: 0; width: 220px; }
+    #sep1 {
+      position: absolute; top: 130px; left: 0;
+      width: 1920px; height: 4px;
+      background: linear-gradient(to right, transparent 0%, #e91e8c 20%, #00e5ff 80%, transparent 100%);
+      z-index: 10;
+    }
+    #sep2 {
+      position: absolute; top: 136px; left: 0;
+      width: 1920px; height: 2px;
+      background: linear-gradient(to right, transparent 10%, rgba(255,160,0,0.35) 35%, rgba(255,160,0,0.35) 65%, transparent 90%);
+      z-index: 10;
+    }
+    #sepFooter {
+      position: absolute; bottom: 0; left: 0;
+      width: 1920px; height: 3px;
+      background: linear-gradient(to right, transparent 0%, #e91e8c 25%, #00e5ff 75%, transparent 100%);
+    }
+
+    #bracket { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    #lines { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    #lines path { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 2; }
+
+    .colLabel {
+      position: absolute;
+      width: 400px;
+      font-size: 16px;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+    }
+    .colLabel.w { color: #e91e8c; text-shadow: 0 0 8px rgba(233,30,140,0.6); }
+    .colLabel.l { color: #00e5ff; text-shadow: 0 0 8px rgba(0,229,255,0.6); }
+
+    .match {
+      position: absolute;
+      width: 400px; height: 110px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .row {
+      flex: 1;
+      display: flex; align-items: stretch;
+      background: rgba(0, 0, 0, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      overflow: hidden;
+    }
+    .row.loser { opacity: 0.45; }
+    .row.tbd .nm { color: rgba(255,255,255,0.45); }
+    .who {
+      flex: 1; min-width: 0;
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 12px;
+    }
+    .team {
+      flex: 0 1 auto; max-width: 100px;
+      font-size: 14px; color: #ffa500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .team:empty { display: none; }
+    .nm {
+      flex: 1 1 auto; min-width: 0;
+      font-size: 24px; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .score {
+      flex: 0 0 64px;
+      display: flex; align-items: center; justify-content: center;
+      background: #e91e8c;
+      font-size: 26px;
+    }
+    .score.dq { font-size: 20px; }
+    .score:empty { background: rgba(233, 30, 140, 0.18); }
+    .row.loser .score { background: rgba(233, 30, 140, 0.6); }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <img id="logo" src="imgs/fgc_hamburg_transp.png" alt="FGC Hamburg">
+    <div id="headerCenter">
+      <span id="eventName"><span id="eventText"></span><span id="top8Tag"> TOP 8</span></span>
+      <span id="tournamentName"></span>
+    </div>
+    <div id="headerSpacer"></div>
+  </div>
+  <div id="sep1"></div>
+  <div id="sep2"></div>
+
+  <div id="bracket">
+    <svg id="lines" width="1920" height="1080"></svg>
+  </div>
+  <div id="sepFooter"></div>
+
+  <script>
+    var cBust = 0;
+    var lastText = null;
+    var params = new URLSearchParams(location.search);
+    var SRC = params.get('src') || '../sc/top8.json';
+
+    // Layout (px)
+    var COL_W = 400, COL_X = [40, 520, 1000, 1480], BOX_H = 110;
+    var W_LABEL_Y = 160, W_Y = [200, 360], W_MID = 280;
+    var L_LABEL_Y = 600, L_Y = [640, 800], L_MID = 720;
+
+    var WINNERS = [
+      { key: 'winnersSemis', label: 'Winners Semis' },
+      { key: 'winnersFinal', label: 'Winners Final' },
+      { key: 'grandFinal', label: 'Grand Final' },
+      { key: 'grandFinalReset', label: 'GF Reset' }
+    ];
+    var LOSERS = [
+      { key: 'losersTop8', label: 'Losers Top 8' },
+      { key: 'losersQuarters', label: 'Losers Quarters' },
+      { key: 'losersSemis', label: 'Losers Semis' },
+      { key: 'losersFinal', label: 'Losers Final' }
+    ];
+
+    var NS = 'http://www.w3.org/2000/svg';
+
+    function el(tag, cls, text) {
+      var e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function rowEl(slot, otherSlot) {
+      slot = slot || {};
+      var tbd = slot.name === null || slot.name === undefined;
+      var cls = 'row';
+      if (tbd) cls += ' tbd';
+      else if (otherSlot && otherSlot.winner && !slot.winner) cls += ' loser';
+      var r = el('div', cls);
+      var who = el('div', 'who');
+      who.appendChild(el('span', 'team', tbd ? '' : (slot.team || '')));
+      who.appendChild(el('span', 'nm', tbd ? 'TBD' : slot.name));
+      r.appendChild(who);
+      var sc = slot.score;
+      var s = el('div', 'score' + (sc === 'DQ' ? ' dq' : ''), (sc === null || sc === undefined) ? '' : String(sc));
+      r.appendChild(s);
+      return r;
+    }
+
+    function matchEl(m, x, y) {
+      var box = el('div', 'match');
+      box.style.left = x + 'px';
+      box.style.top = y + 'px';
+      m = m || {};
+      box.appendChild(rowEl(m.p1, m.p2));
+      box.appendChild(rowEl(m.p2, m.p1));
+      return box;
+    }
+
+    function line(d) {
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d);
+      return p;
+    }
+
+    // straight line between right edge of col a and left edge of col b at y
+    function straight(svg, colA, colB, y) {
+      svg.appendChild(line('M' + (COL_X[colA] + COL_W) + ' ' + y + 'H' + COL_X[colB]));
+    }
+
+    // two boxes at ys[] in colA join into a single box at yMid in colB
+    function elbow(svg, colA, colB, ys, yMid) {
+      var x1 = COL_X[colA] + COL_W, x2 = COL_X[colB];
+      var xm = x1 + (x2 - x1) / 2;
+      ys.forEach(function (y) {
+        svg.appendChild(line('M' + x1 + ' ' + y + 'H' + xm + 'V' + yMid));
+      });
+      svg.appendChild(line('M' + xm + ' ' + yMid + 'H' + x2));
+    }
+
+    // Shrink the title font until it fits on one line next to the logo.
+    function fitTitle() {
+      var t = document.getElementById('eventName');
+      var box = document.getElementById('headerCenter');
+      var size = 40;
+      t.style.fontSize = size + 'px';
+      while (size > 16 && t.scrollWidth > box.clientWidth) {
+        size -= 1;
+        t.style.fontSize = size + 'px';
+      }
+    }
+
+    function render(d) {
+      var rounds = d.rounds || {};
+      var bracket = document.getElementById('bracket');
+      var svg = document.getElementById('lines');
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      Array.prototype.slice.call(bracket.children).forEach(function (c) {
+        if (c !== svg) bracket.removeChild(c);
+      });
+
+      // Title = tournament name + " TOP 8"; subtitle = event name.
+      document.getElementById('eventText').textContent = d.tournamentName || '';
+      document.getElementById('tournamentName').textContent = d.eventName || '';
+      fitTitle();
+
+      var reset = rounds.grandFinalReset || [];
+      var hasReset = reset.length > 0;
+      var cy = BOX_H / 2;
+
+      function label(text, col, y, cls) {
+        var l = el('div', 'colLabel ' + cls, text);
+        l.style.left = COL_X[col] + 'px';
+        l.style.top = y + 'px';
+        bracket.appendChild(l);
+      }
+      function place(list, col, ys) {
+        for (var i = 0; i < ys.length; i++) {
+          bracket.appendChild(matchEl(list[i], COL_X[col], ys[i]));
+        }
+      }
+
+      // Winners block
+      WINNERS.forEach(function (c, i) {
+        if (c.key === 'grandFinalReset' && !hasReset) return;
+        label(c.label, i, W_LABEL_Y, 'w');
+      });
+      place(rounds.winnersSemis || [], 0, W_Y);
+      place(rounds.winnersFinal || [], 1, [W_MID]);
+      place(rounds.grandFinal || [], 2, [W_MID]);
+      if (hasReset) place(reset, 3, [W_MID]);
+      elbow(svg, 0, 1, [W_Y[0] + cy, W_Y[1] + cy], W_MID + cy);
+      straight(svg, 1, 2, W_MID + cy);
+      if (hasReset) straight(svg, 2, 3, W_MID + cy);
+
+      // Losers block
+      LOSERS.forEach(function (c, i) { label(c.label, i, L_LABEL_Y, 'l'); });
+      place(rounds.losersTop8 || [], 0, L_Y);
+      place(rounds.losersQuarters || [], 1, L_Y);
+      place(rounds.losersSemis || [], 2, [L_MID]);
+      place(rounds.losersFinal || [], 3, [L_MID]);
+      straight(svg, 0, 1, L_Y[0] + cy);
+      straight(svg, 0, 1, L_Y[1] + cy);
+      elbow(svg, 1, 2, [L_Y[0] + cy, L_Y[1] + cy], L_MID + cy);
+      straight(svg, 2, 3, L_MID + cy);
+
+      fitNames();
+    }
+
+    // shrink long names to fit their box; CSS ellipsis is the last resort
+    function fitNames() {
+      var names = document.querySelectorAll('.nm');
+      for (var i = 0; i < names.length; i++) {
+        var n = names[i], size = 24;
+        n.style.fontSize = size + 'px';
+        while (n.scrollWidth > n.clientWidth && size > 14) {
+          size -= 1;
+          n.style.fontSize = size + 'px';
+        }
+      }
+    }
+
+    function pollJSON() {
+      var xhr = new XMLHttpRequest();
+      xhr.overrideMimeType('application/json');
+      xhr.open('GET', SRC + (SRC.indexOf('?') < 0 ? '?' : '&') + 'v=' + cBust, true);
+      cBust++;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        // a missing file (404) or file:// failure (status 0, empty body) keeps the current DOM
+        if (!xhr.responseText || (xhr.status !== 200 && xhr.status !== 0)) return;
+        try {
+          var d = JSON.parse(xhr.responseText);
+          var key = JSON.stringify(Object.assign({}, d, { updatedAt: 0 }));
+          if (key === lastText) return;
+          render(d);
+          lastText = key;
+        } catch (e) {}
+      };
+      xhr.send();
+    }
+
+    setInterval(pollJSON, 500);
+    pollJSON();
+  </script>
+</body>
+</html>

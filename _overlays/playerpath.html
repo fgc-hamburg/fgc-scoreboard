@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Player Path</title>
+  <style>
+    @font-face {
+      src: url('fonts/ValorantFont.ttf');
+      font-family: "Valorant";
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      position: relative;
+      font-family: "Valorant";
+      color: white;
+      text-transform: uppercase;
+      background:
+        radial-gradient(ellipse at 50% 38%, rgba(255, 140, 0, 0.08) 0%, transparent 58%),
+        radial-gradient(circle, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+        #0d0d0d;
+      background-size: auto, 44px 44px, auto;
+    }
+
+    #header {
+      position: absolute; left: 0; top: 0;
+      width: 1920px; height: 130px;
+      background: rgba(0, 0, 0, 0.9);
+      display: flex; align-items: center;
+      padding: 0 40px;
+      z-index: 10;
+    }
+    #logo { height: 108px; width: auto; flex-shrink: 0; }
+    #headerCenter { flex: 1; text-align: center; }
+    #title {
+      display: block;
+      font-size: 40px;
+      color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 1200px; margin: 0 auto;
+      letter-spacing: 0.07em;
+      line-height: 1.1;
+      text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.9);
+    }
+    #team {
+      color: #ffa500;
+      text-shadow: 0 0 20px rgba(255, 165, 0, 0.45), 2px 2px 0 rgba(0, 0, 0, 0.9);
+    }
+    #team:empty { display: none; }
+    #team::after { content: " "; white-space: pre; }
+    #subtitle {
+      display: block;
+      font-size: 20px;
+      color: #00e5ff;
+      text-shadow: 0 0 16px rgba(0, 229, 255, 0.5), 1px 1px 0 rgba(0, 0, 0, 0.9);
+      margin-top: 8px;
+      letter-spacing: 0.14em;
+    }
+    #headerSpacer { flex-shrink: 0; width: 220px; }
+    #sep1 {
+      position: absolute; top: 130px; left: 0;
+      width: 1920px; height: 4px;
+      background: linear-gradient(to right, transparent 0%, #e91e8c 20%, #00e5ff 80%, transparent 100%);
+      z-index: 10;
+    }
+    #sep2 {
+      position: absolute; top: 136px; left: 0;
+      width: 1920px; height: 2px;
+      background: linear-gradient(to right, transparent 10%, rgba(255,160,0,0.35) 35%, rgba(255,160,0,0.35) 65%, transparent 90%);
+      z-index: 10;
+    }
+    #sepFooter {
+      position: absolute; bottom: 0; left: 0;
+      width: 1920px; height: 3px;
+      background: linear-gradient(to right, transparent 0%, #e91e8c 25%, #00e5ff 75%, transparent 100%);
+    }
+
+
+    #table {
+      position: absolute; left: 260px; top: 190px;
+      width: 1400px;
+    }
+    .trow {
+      display: flex; align-items: stretch;
+      margin-bottom: 6px;
+      background: rgba(0, 0, 0, 0.62);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      overflow: hidden;
+    }
+    .trow.head {
+      background: none; border: none;
+      height: 36px !important;
+      color: #e91e8c; font-size: 18px; letter-spacing: 0.14em;
+      text-shadow: 0 0 8px rgba(233,30,140,0.6);
+    }
+    .trow.head .c { background: none; }
+    .trow.loss { opacity: 0.5; }
+    .c { display: flex; align-items: center; padding: 0 20px; min-width: 0; }
+    .c.round { flex: 0 0 420px; font-size: 24px; color: #00e5ff; }
+    .c.opp { flex: 1 1 auto; gap: 14px; }
+    .c.score { flex: 0 0 180px; justify-content: center; font-size: 32px; background: #e91e8c; }
+    .trow.loss .c.score { background: #777; }
+    .trow.head .c.score { background: none; font-size: 18px; }
+    .c .t { flex: 0 1 auto; max-width: 280px; font-size: 18px; color: #ffa500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .c .t:empty { display: none; }
+    .c .n { flex: 1 1 auto; min-width: 0; font-size: 30px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .c.round span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <img id="logo" src="imgs/fgc_hamburg_transp.png" alt="FGC Hamburg">
+    <div id="headerCenter">
+      <span id="title"><span id="team"></span><span id="player"></span></span>
+      <span id="subtitle"></span>
+    </div>
+    <div id="headerSpacer"></div>
+  </div>
+  <div id="sep1"></div>
+  <div id="sep2"></div>
+  <div id="table"></div>
+  <div id="sepFooter"></div>
+
+  <script>
+    var cBust = 0;
+    var lastText = null;
+    var params = new URLSearchParams(location.search);
+    var SRC = params.get('src') || '../sc/playerpath.json';
+
+    function el(tag, cls, text) {
+      var e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text !== undefined) e.textContent = text;
+      return e;
+    }
+
+    function cell(cls, kids) {
+      var c = el('div', 'c ' + cls);
+      kids.forEach(function (k) { c.appendChild(k); });
+      return c;
+    }
+
+    function render(d) {
+      var player = d.player || {};
+      document.getElementById('team').textContent = player.team || '';
+      document.getElementById('player').textContent = player.name || '';
+      document.getElementById('subtitle').textContent = d.currentRound ? 'Road to ' + d.currentRound : '';
+
+      var sets = d.sets || [];
+      var table = document.getElementById('table');
+      while (table.firstChild) table.removeChild(table.firstChild);
+
+      var head = el('div', 'trow head');
+      head.appendChild(cell('round', [el('span', '', 'Round')]));
+      head.appendChild(cell('opp', [el('span', '', 'Opponent')]));
+      head.appendChild(cell('score', [el('span', '', 'Score')]));
+      table.appendChild(head);
+
+      var h = Math.min(80, 820 / Math.max(sets.length, 1));
+      var scale = Math.min(1, h / 80);
+      sets.forEach(function (s) {
+        var opp = s.opponent || {};
+        var r = el('div', 'trow' + (s.won ? '' : ' loss'));
+        r.style.height = (h - 6) + 'px';
+        r.appendChild(cell('round', [el('span', '', s.round || '')]));
+        r.appendChild(cell('opp', [el('span', 't', opp.team || ''), el('span', 'n', opp.name || '')]));
+        r.appendChild(cell('score', [el('span', '', s.score === null || s.score === undefined ? '' : String(s.score))]));
+        r.style.fontSize = '';
+        r.querySelectorAll('.n').forEach(function (n) { n.style.fontSize = Math.max(14, 30 * scale) + 'px'; });
+        r.querySelectorAll('.c.round').forEach(function (n) { n.style.fontSize = Math.max(12, 24 * scale) + 'px'; });
+        r.querySelectorAll('.c.score').forEach(function (n) { n.style.fontSize = Math.max(14, 32 * scale) + 'px'; });
+        table.appendChild(r);
+      });
+    }
+
+    function pollJSON() {
+      var xhr = new XMLHttpRequest();
+      xhr.overrideMimeType('application/json');
+      xhr.open('GET', SRC + (SRC.indexOf('?') < 0 ? '?' : '&') + 'v=' + cBust, true);
+      cBust++;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        // a missing file (404) or file:// failure (status 0, empty body) keeps the current DOM
+        if (!xhr.responseText || (xhr.status !== 200 && xhr.status !== 0)) return;
+        try {
+          var d = JSON.parse(xhr.responseText);
+          var key = JSON.stringify(Object.assign({}, d, { updatedAt: 0 }));
+          if (key === lastText) return;
+          render(d);
+          lastText = key;
+        } catch (e) {}
+      };
+      xhr.send();
+    }
+
+    setInterval(pollJSON, 500);
+    pollJSON();
+  </script>
+</body>
+</html>

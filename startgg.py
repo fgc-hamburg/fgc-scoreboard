@@ -220,3 +220,85 @@ def build_config_response(token, refresh_seconds, cfg):
         "slug": cfg.get("slug"),
         "streamName": cfg.get("streamName"),
     }
+
+
+_SLOTS = ("slots { entrant { id name participants { prefix gamerTag } } "
+          "standing { stats { score { value } } } }")
+
+SET_CONTEXT_QUERY = (
+    "query SetContext($setId: ID!) { set(id: $setId) { "
+    "id round fullRoundText identifier state winnerId " + _SLOTS +
+    " event { id name tournament { name } } phaseGroup { id } } }")
+
+PHASE_GROUP_SETS_QUERY = (
+    "query PhaseGroupSets($phaseGroupId: ID!, $page: Int!, $perPage: Int!) { "
+    "phaseGroup(id: $phaseGroupId) { sets(page: $page, perPage: $perPage, "
+    "sortType: STANDARD) { pageInfo { totalPages } nodes { "
+    "id round fullRoundText identifier state winnerId completedAt " + _SLOTS +
+    " } } } }")
+
+ENTRANT_EVENT_SETS_QUERY = (
+    "query EntrantEventSets($eventId: ID!, $entrantId: ID!, $page: Int!, "
+    "$perPage: Int!) { event(id: $eventId) { sets(page: $page, perPage: $perPage, "
+    "filters: { entrantIds: [$entrantId], state: [3] }) { "
+    "pageInfo { totalPages } nodes { "
+    "id fullRoundText state winnerId completedAt " + _SLOTS + " } } } }")
+
+
+TOURNAMENT_EVENTS_QUERY = (
+    "query TournamentEvents($slug: String!) { tournament(slug: $slug) { name "
+    "events { id name phases { id phaseOrder bracketType "
+    "phaseGroups(query: {perPage: 50}) { nodes { id } } } } } }")
+
+
+def fetch_tournament_events(slug, token):
+    """Fetch a tournament's name and its events/phases/phase group ids."""
+    t = _graphql(TOURNAMENT_EVENTS_QUERY, {"slug": slug}, token).get("tournament")
+    if not t:
+        raise StreamQueueError("Tournament not found")
+    events = []
+    for ev in t.get("events") or []:
+        phases = []
+        for ph in ev.get("phases") or []:
+            nodes = (ph.get("phaseGroups") or {}).get("nodes") or []
+            phases.append({
+                "id": ph.get("id"),
+                "phaseOrder": ph.get("phaseOrder"),
+                "bracketType": ph.get("bracketType"),
+                "phaseGroupIds": [n.get("id") for n in nodes],
+            })
+        events.append({"id": ev.get("id"), "name": ev.get("name"), "phases": phases})
+    return {"tournamentName": t.get("name"), "events": events}
+
+
+def fetch_set_context(set_id, token):
+    """Fetch one set with its event, tournament and phase group."""
+    node = _graphql(SET_CONTEXT_QUERY, {"setId": set_id}, token).get("set")
+    if not node:
+        raise StreamQueueError("Set not found")
+    return node
+
+
+def _paginate(query, variables, token, path, per_page):
+    nodes = []
+    page = 1
+    while True:
+        data = _graphql(query, dict(variables, page=page, perPage=per_page), token)
+        for key in path:
+            data = (data or {}).get(key) or {}
+        nodes.extend(data.get("nodes") or [])
+        total = (data.get("pageInfo") or {}).get("totalPages") or 1
+        if page >= total:
+            return nodes
+        page += 1
+
+
+def fetch_phase_group_sets(phase_group_id, token, per_page=40):
+    return _paginate(PHASE_GROUP_SETS_QUERY, {"phaseGroupId": phase_group_id},
+                     token, ("phaseGroup", "sets"), per_page)
+
+
+def fetch_entrant_event_sets(event_id, entrant_id, token, per_page=40):
+    return _paginate(ENTRANT_EVENT_SETS_QUERY,
+                     {"eventId": event_id, "entrantId": entrant_id},
+                     token, ("event", "sets"), per_page)

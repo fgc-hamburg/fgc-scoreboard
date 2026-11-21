@@ -95,6 +95,29 @@ is only active for a match loaded from the queue; editing a player's name
 unbinds it (click the card again to re-enable). Sponsor tags from start.gg are
 filled into the Team/Sponsor field automatically.
 
+### Top 8 & Player Path overlays
+
+Two extra OBS overlays are fed from start.gg: a top 8 bracket and a "road to"
+table with one player's completed sets.
+
+Add each as a **Browser** source in OBS, with **Local file** ticked and the
+size set to 1920x1080:
+
+- `_overlays/top8.html` — the top 8 bracket
+- `_overlays/playerpath.html` — the path table of one player
+
+They need `STARTGG_TOKEN`. The top 8 appears as soon as a tournament is
+connected in the stream queue; for a tournament with several events, pick one
+with the **Top 8 event** dropdown in the dashboard. The player path still
+needs a match loaded from the queue and submitted with **Submit**. The **P1/P2** toggle in the dashboard chooses whose path
+`playerpath.html` shows. Both overlays show an empty frame (header only) until
+data is available, and keep the last good data if start.gg is unreachable.
+
+The server refreshes the data from start.gg every `STREAM_QUEUE_REFRESH_SECONDS`
+(default `30`) and on every Submit. The overlays re-read their JSON files
+(`sc/top8.json`, `sc/playerpath.json`) twice a second, so new results show up
+within one refresh interval. Changing the tournament switches the top 8 on the next refresh.
+
 ---
 
 
